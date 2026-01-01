@@ -1,0 +1,586 @@
+/**
+ * ClaudeApiUtils.unit.test.js - Unit tests for ClaudeApiUtils
+ *
+ * Tests the shared Claude API utility functions including:
+ * - Response parsing and text extraction
+ * - JSON extraction from various formats
+ * - Error parsing and classification
+ * - Context exceeded error detection
+ *
+ * Note: API call functions are tested via integration tests
+ * since they require actual network calls
+ *
+ * @module sheets-chat/test/ClaudeApiUtils.unit.test
+ */
+function _main(
+  module = globalThis.__getCurrentModule(),
+  exports = module.exports,
+  log = globalThis.__getModuleLogFunction?.(module) || (() => {})
+) {
+
+  // Dependencies
+  const { describe, it, beforeEach, afterEach } = require('test-framework/mocha-adapter');
+  const { expect } = require('test-framework/chai-assertions');
+  const ClaudeApiUtils = require('sheets-chat/ClaudeApiUtils');
+
+  // ============================================================================
+  // TEST SUITE: Configuration
+  // ============================================================================
+
+  describe('ClaudeApiUtils', function() {
+
+    describe('API_CONFIG', function() {
+
+      it('should have correct base URL', function() {
+        expect(ClaudeApiUtils.API_CONFIG.baseUrl).to.equal('https://api.anthropic.com/v1/messages');
+      });
+
+      it('should have correct anthropic version', function() {
+        expect(ClaudeApiUtils.API_CONFIG.anthropicVersion).to.equal('2023-06-01');
+      });
+
+      it('should have default model set to Haiku', function() {
+        expect(ClaudeApiUtils.API_CONFIG.defaultModel).to.include('haiku');
+      });
+
+      it('should have reasonable retry configuration', function() {
+        const retry = ClaudeApiUtils.API_CONFIG.retry;
+        expect(retry.maxRetries).to.be.at.least(1);
+        expect(retry.maxRetries).to.be.at.most(10);
+        expect(retry.baseDelayMs).to.be.at.least(500);
+        expect(retry.retryableStatuses).to.include(429);
+        expect(retry.retryableStatuses).to.include(503);
+        expect(retry.nonRetryableStatuses).to.include(400);
+        expect(retry.nonRetryableStatuses).to.include(401);
+      });
+
+    });
+
+    describe('ClaudeErrorTypes', function() {
+
+      it('should define standard error types', function() {
+        expect(ClaudeApiUtils.ClaudeErrorTypes.INVALID_REQUEST).to.equal('invalid_request_error');
+        expect(ClaudeApiUtils.ClaudeErrorTypes.AUTHENTICATION).to.equal('authentication_error');
+        expect(ClaudeApiUtils.ClaudeErrorTypes.RATE_LIMIT).to.equal('rate_limit_error');
+        expect(ClaudeApiUtils.ClaudeErrorTypes.OVERLOADED).to.equal('overloaded_error');
+        expect(ClaudeApiUtils.ClaudeErrorTypes.API_ERROR).to.equal('api_error');
+      });
+
+    });
+
+  });
+
+  // ============================================================================
+  // TEST SUITE: extractTextFromResponse
+  // ============================================================================
+
+  describe('extractTextFromResponse', function() {
+
+    it('should extract text from standard response', function() {
+      const response = {
+        content: [
+          { type: 'text', text: 'Hello, world!' }
+        ]
+      };
+
+      const text = ClaudeApiUtils.extractTextFromResponse(response);
+      expect(text).to.equal('Hello, world!');
+    });
+
+    it('should extract and join multiple text blocks', function() {
+      const response = {
+        content: [
+          { type: 'text', text: 'First paragraph.' },
+          { type: 'text', text: 'Second paragraph.' }
+        ]
+      };
+
+      const text = ClaudeApiUtils.extractTextFromResponse(response);
+      expect(text).to.equal('First paragraph.\nSecond paragraph.');
+    });
+
+    it('should filter out non-text blocks', function() {
+      const response = {
+        content: [
+          { type: 'text', text: 'Some text' },
+          { type: 'tool_use', id: 'tool_123', name: 'search', input: {} },
+          { type: 'text', text: 'More text' }
+        ]
+      };
+
+      const text = ClaudeApiUtils.extractTextFromResponse(response);
+      expect(text).to.equal('Some text\nMore text');
+    });
+
+    it('should return empty string for null response', function() {
+      expect(ClaudeApiUtils.extractTextFromResponse(null)).to.equal('');
+      expect(ClaudeApiUtils.extractTextFromResponse(undefined)).to.equal('');
+    });
+
+    it('should return empty string for response without content', function() {
+      expect(ClaudeApiUtils.extractTextFromResponse({})).to.equal('');
+      expect(ClaudeApiUtils.extractTextFromResponse({ content: null })).to.equal('');
+    });
+
+    it('should handle empty content array', function() {
+      const response = { content: [] };
+      expect(ClaudeApiUtils.extractTextFromResponse(response)).to.equal('');
+    });
+
+    it('should skip text blocks with missing text property', function() {
+      const response = {
+        content: [
+          { type: 'text', text: 'Valid' },
+          { type: 'text' },  // Missing text
+          { type: 'text', text: null },  // Null text
+          { type: 'text', text: 'Also valid' }
+        ]
+      };
+
+      const text = ClaudeApiUtils.extractTextFromResponse(response);
+      expect(text).to.equal('Valid\nAlso valid');
+    });
+
+  });
+
+  // ============================================================================
+  // TEST SUITE: extractJSONFromText
+  // ============================================================================
+
+  describe('extractJSONFromText', function() {
+
+    it('should extract JSON from plain object', function() {
+      const text = '{"key": "value"}';
+      const result = ClaudeApiUtils.extractJSONFromText(text);
+      expect(result).to.equal('{"key": "value"}');
+    });
+
+    it('should extract JSON from markdown code block', function() {
+      const text = 'Here is the result:\n```json\n{"key": "value"}\n```';
+      const result = ClaudeApiUtils.extractJSONFromText(text);
+      expect(result).to.equal('{"key": "value"}');
+    });
+
+    it('should extract JSON from code block without language', function() {
+      const text = '```\n{"key": "value"}\n```';
+      const result = ClaudeApiUtils.extractJSONFromText(text);
+      expect(result).to.equal('{"key": "value"}');
+    });
+
+    it('should extract JSON array', function() {
+      const text = 'The array is: [1, 2, 3]';
+      const result = ClaudeApiUtils.extractJSONFromText(text);
+      expect(result).to.equal('[1, 2, 3]');
+    });
+
+    it('should extract complex nested JSON', function() {
+      const text = 'Result: {"entities": {"user": "James"}, "facts": ["fact1", "fact2"]}';
+      const result = ClaudeApiUtils.extractJSONFromText(text);
+      expect(JSON.parse(result)).to.deep.equal({
+        entities: { user: 'James' },
+        facts: ['fact1', 'fact2']
+      });
+    });
+
+    it('should return empty object for empty input', function() {
+      expect(ClaudeApiUtils.extractJSONFromText('')).to.equal('{}');
+      expect(ClaudeApiUtils.extractJSONFromText(null)).to.equal('{}');
+      expect(ClaudeApiUtils.extractJSONFromText(undefined)).to.equal('{}');
+    });
+
+    it('should handle text with no JSON', function() {
+      const text = 'This is just plain text with no JSON.';
+      const result = ClaudeApiUtils.extractJSONFromText(text);
+      // Should return trimmed original text
+      expect(result).to.equal(text);
+    });
+
+    it('should prefer code block over inline JSON', function() {
+      const text = '{"inline": true}\n```json\n{"codeblock": true}\n```';
+      const result = ClaudeApiUtils.extractJSONFromText(text);
+      expect(JSON.parse(result)).to.deep.equal({ codeblock: true });
+    });
+
+    it('should handle multiline JSON in code block', function() {
+      const text = '```json\n{\n  "key": "value",\n  "nested": {\n    "inner": 123\n  }\n}\n```';
+      const result = ClaudeApiUtils.extractJSONFromText(text);
+      const parsed = JSON.parse(result);
+      expect(parsed.key).to.equal('value');
+      expect(parsed.nested.inner).to.equal(123);
+    });
+
+    it('should extract first balanced JSON object when multiple exist', function() {
+      // This tests the balanced brace matching - should get first complete object
+      const text = 'Here is {obj1: "value1"} and then {obj2: "value2"}';
+      const result = ClaudeApiUtils.extractJSONFromText(text);
+      // Note: These aren't valid JSON (unquoted keys), but tests the extraction logic
+      expect(result).to.include('obj1');
+      expect(result).not.to.include('obj2');
+    });
+
+    it('should handle nested braces correctly', function() {
+      const text = 'Result: {"outer": {"inner": {"deep": true}}}';
+      const result = ClaudeApiUtils.extractJSONFromText(text);
+      const parsed = JSON.parse(result);
+      expect(parsed.outer.inner.deep).to.be.true;
+    });
+
+    it('should handle braces inside strings', function() {
+      const text = 'Here: {"message": "Hello {name}!"}';
+      const result = ClaudeApiUtils.extractJSONFromText(text);
+      const parsed = JSON.parse(result);
+      expect(parsed.message).to.equal('Hello {name}!');
+    });
+
+    it('should handle escaped quotes in strings', function() {
+      const text = '{"text": "He said \\"hello\\" to me"}';
+      const result = ClaudeApiUtils.extractJSONFromText(text);
+      const parsed = JSON.parse(result);
+      expect(parsed.text).to.equal('He said "hello" to me');
+    });
+
+    it('should extract array when it comes before object', function() {
+      const text = 'List: [1, 2, 3] and then {"key": "value"}';
+      const result = ClaudeApiUtils.extractJSONFromText(text);
+      expect(JSON.parse(result)).to.deep.equal([1, 2, 3]);
+    });
+
+  });
+
+  // ============================================================================
+  // TEST SUITE: parseClaudeError
+  // ============================================================================
+
+  describe('parseClaudeError', function() {
+
+    it('should parse standard Claude error object', function() {
+      const error = {
+        type: 'invalid_request_error',
+        message: 'Invalid API key provided'
+      };
+
+      const result = ClaudeApiUtils.parseClaudeError(error);
+      expect(result.type).to.equal('invalid_request_error');
+      expect(result.message).to.equal('Invalid API key provided');
+    });
+
+    it('should handle error with only type', function() {
+      const error = { type: 'rate_limit_error' };
+
+      const result = ClaudeApiUtils.parseClaudeError(error);
+      expect(result.type).to.equal('rate_limit_error');
+      expect(result.message).to.include('rate_limit_error');
+    });
+
+    it('should handle error with only message', function() {
+      const error = { message: 'Something went wrong' };
+
+      const result = ClaudeApiUtils.parseClaudeError(error);
+      expect(result.type).to.equal('unknown');
+      expect(result.message).to.equal('Something went wrong');
+    });
+
+    it('should handle null error', function() {
+      const result = ClaudeApiUtils.parseClaudeError(null);
+      expect(result.type).to.equal('unknown');
+      expect(result.message).to.equal('Unknown error');
+    });
+
+    it('should handle undefined error', function() {
+      const result = ClaudeApiUtils.parseClaudeError(undefined);
+      expect(result.type).to.equal('unknown');
+      expect(result.message).to.equal('Unknown error');
+    });
+
+    it('should handle empty error object', function() {
+      const result = ClaudeApiUtils.parseClaudeError({});
+      expect(result.type).to.equal('unknown');
+    });
+
+  });
+
+  // ============================================================================
+  // TEST SUITE: parseErrorMessage
+  // ============================================================================
+
+  describe('parseErrorMessage', function() {
+
+    it('should identify rate limit errors as retryable', function() {
+      const result = ClaudeApiUtils.parseErrorMessage('Rate limit exceeded');
+      expect(result.type).to.equal(ClaudeApiUtils.ClaudeErrorTypes.RATE_LIMIT);
+      expect(result.isRetryable).to.be.true;
+    });
+
+    it('should identify 429 errors as rate limit', function() {
+      const result = ClaudeApiUtils.parseErrorMessage('HTTP 429 Too Many Requests');
+      expect(result.type).to.equal(ClaudeApiUtils.ClaudeErrorTypes.RATE_LIMIT);
+      expect(result.isRetryable).to.be.true;
+    });
+
+    it('should identify overloaded errors as retryable', function() {
+      const result = ClaudeApiUtils.parseErrorMessage('API is overloaded');
+      expect(result.type).to.equal(ClaudeApiUtils.ClaudeErrorTypes.OVERLOADED);
+      expect(result.isRetryable).to.be.true;
+    });
+
+    it('should identify 529 errors as overloaded', function() {
+      const result = ClaudeApiUtils.parseErrorMessage('HTTP 529');
+      expect(result.type).to.equal(ClaudeApiUtils.ClaudeErrorTypes.OVERLOADED);
+      expect(result.isRetryable).to.be.true;
+    });
+
+    it('should identify server errors as retryable', function() {
+      const errorCodes = ['500', '502', '503', '504'];
+      for (const code of errorCodes) {
+        const result = ClaudeApiUtils.parseErrorMessage(`HTTP ${code} error`);
+        expect(result.type).to.equal(ClaudeApiUtils.ClaudeErrorTypes.API_ERROR);
+        expect(result.isRetryable).to.be.true;
+      }
+    });
+
+    it('should identify authentication errors as non-retryable', function() {
+      const result = ClaudeApiUtils.parseErrorMessage('Authentication failed');
+      expect(result.type).to.equal(ClaudeApiUtils.ClaudeErrorTypes.AUTHENTICATION);
+      expect(result.isRetryable).to.be.false;
+    });
+
+    it('should identify 401 errors as authentication', function() {
+      const result = ClaudeApiUtils.parseErrorMessage('HTTP 401 Unauthorized');
+      expect(result.type).to.equal(ClaudeApiUtils.ClaudeErrorTypes.AUTHENTICATION);
+      expect(result.isRetryable).to.be.false;
+    });
+
+    it('should identify permission errors as non-retryable', function() {
+      const result = ClaudeApiUtils.parseErrorMessage('Permission denied');
+      expect(result.type).to.equal(ClaudeApiUtils.ClaudeErrorTypes.PERMISSION);
+      expect(result.isRetryable).to.be.false;
+    });
+
+    it('should identify 403 errors as permission', function() {
+      const result = ClaudeApiUtils.parseErrorMessage('HTTP 403 Forbidden');
+      expect(result.type).to.equal(ClaudeApiUtils.ClaudeErrorTypes.PERMISSION);
+      expect(result.isRetryable).to.be.false;
+    });
+
+    it('should identify invalid request errors as non-retryable', function() {
+      const result = ClaudeApiUtils.parseErrorMessage('Invalid request parameters');
+      expect(result.type).to.equal(ClaudeApiUtils.ClaudeErrorTypes.INVALID_REQUEST);
+      expect(result.isRetryable).to.be.false;
+    });
+
+    it('should identify context/token errors as non-retryable', function() {
+      const testCases = [
+        'Context length exceeded',
+        'Token limit reached',
+        'prompt is too long'
+      ];
+
+      for (const message of testCases) {
+        const result = ClaudeApiUtils.parseErrorMessage(message);
+        expect(result.type).to.equal(ClaudeApiUtils.ClaudeErrorTypes.INVALID_REQUEST);
+        expect(result.isRetryable).to.be.false;
+      }
+    });
+
+    it('should return unknown for unrecognized errors', function() {
+      const result = ClaudeApiUtils.parseErrorMessage('Something unexpected happened');
+      expect(result.type).to.equal('unknown');
+      expect(result.isRetryable).to.be.false;
+    });
+
+    it('should handle empty message', function() {
+      const result = ClaudeApiUtils.parseErrorMessage('');
+      expect(result.type).to.equal('unknown');
+      expect(result.isRetryable).to.be.false;
+    });
+
+    it('should handle null message', function() {
+      const result = ClaudeApiUtils.parseErrorMessage(null);
+      expect(result.type).to.equal('unknown');
+      expect(result.isRetryable).to.be.false;
+    });
+
+  });
+
+  // ============================================================================
+  // TEST SUITE: isContextExceededError
+  // ============================================================================
+
+  describe('isContextExceededError', function() {
+
+    it('should detect context_length_exceeded', function() {
+      const error = { message: 'context_length_exceeded: too many tokens' };
+      expect(ClaudeApiUtils.isContextExceededError(error)).to.be.true;
+    });
+
+    it('should detect "prompt is too long"', function() {
+      const error = { message: 'prompt is too long: 250000 tokens' };
+      expect(ClaudeApiUtils.isContextExceededError(error)).to.be.true;
+    });
+
+    it('should detect max_tokens errors', function() {
+      const error = { message: 'max_tokens exceeded' };
+      expect(ClaudeApiUtils.isContextExceededError(error)).to.be.true;
+    });
+
+    it('should detect "context window" errors', function() {
+      const error = { message: 'Input exceeds context window' };
+      expect(ClaudeApiUtils.isContextExceededError(error)).to.be.true;
+    });
+
+    it('should detect "token limit" errors', function() {
+      const error = { message: 'Token limit reached' };
+      expect(ClaudeApiUtils.isContextExceededError(error)).to.be.true;
+    });
+
+    it('should detect "exceeds the maximum" errors', function() {
+      const error = { message: 'Input size exceeds the maximum allowed' };
+      expect(ClaudeApiUtils.isContextExceededError(error)).to.be.true;
+    });
+
+    it('should handle nested error object', function() {
+      const error = {
+        error: {
+          message: 'context_length_exceeded'
+        }
+      };
+      expect(ClaudeApiUtils.isContextExceededError(error)).to.be.true;
+    });
+
+    it('should handle string error', function() {
+      expect(ClaudeApiUtils.isContextExceededError('prompt is too long')).to.be.true;
+    });
+
+    it('should return false for unrelated errors', function() {
+      const error = { message: 'Authentication failed' };
+      expect(ClaudeApiUtils.isContextExceededError(error)).to.be.false;
+    });
+
+    it('should return false for null', function() {
+      expect(ClaudeApiUtils.isContextExceededError(null)).to.be.false;
+    });
+
+    it('should return false for undefined', function() {
+      expect(ClaudeApiUtils.isContextExceededError(undefined)).to.be.false;
+    });
+
+    it('should be case insensitive', function() {
+      const error = { message: 'CONTEXT_LENGTH_EXCEEDED' };
+      expect(ClaudeApiUtils.isContextExceededError(error)).to.be.true;
+    });
+
+  });
+
+  // ============================================================================
+  // TEST SUITE: callClaudeAPI validation
+  // ============================================================================
+
+  describe('callClaudeAPI input validation', function() {
+
+    it('should return error for missing messages', function() {
+      const result = ClaudeApiUtils.callClaudeAPI({});
+      expect(result.success).to.be.false;
+      expect(result.error).to.include('Messages array is required');
+    });
+
+    it('should return error for empty messages array', function() {
+      const result = ClaudeApiUtils.callClaudeAPI({ messages: [] });
+      expect(result.success).to.be.false;
+      expect(result.error).to.include('must not be empty');
+    });
+
+    it('should return error for non-array messages', function() {
+      const result = ClaudeApiUtils.callClaudeAPI({ messages: 'not an array' });
+      expect(result.success).to.be.false;
+      expect(result.error).to.include('Messages array is required');
+    });
+
+    it('should return error for null messages', function() {
+      const result = ClaudeApiUtils.callClaudeAPI({ messages: null });
+      expect(result.success).to.be.false;
+      expect(result.error).to.include('Messages array is required');
+    });
+
+    // Note: API key validation requires actual config access
+    // Integration tests cover the full callClaudeAPI flow
+
+  });
+
+  // ============================================================================
+  // TEST SUITE: complete validation
+  // ============================================================================
+
+  describe('complete input validation', function() {
+
+    it('should return error for missing prompt', function() {
+      const result = ClaudeApiUtils.complete();
+      expect(result.success).to.be.false;
+      expect(result.error).to.include('non-empty string');
+    });
+
+    it('should return error for empty prompt', function() {
+      const result = ClaudeApiUtils.complete('');
+      expect(result.success).to.be.false;
+      expect(result.error).to.include('non-empty string');
+    });
+
+    it('should return error for non-string prompt', function() {
+      const result = ClaudeApiUtils.complete({ text: 'hello' });
+      expect(result.success).to.be.false;
+      expect(result.error).to.include('non-empty string');
+    });
+
+    it('should return error for null prompt', function() {
+      const result = ClaudeApiUtils.complete(null);
+      expect(result.success).to.be.false;
+      expect(result.error).to.include('non-empty string');
+    });
+
+  });
+
+  // ============================================================================
+  // TEST SUITE: completeJSON validation
+  // ============================================================================
+
+  describe('completeJSON input validation', function() {
+
+    it('should return error for missing prompt', function() {
+      const result = ClaudeApiUtils.completeJSON();
+      expect(result.success).to.be.false;
+      expect(result.error).to.include('non-empty string');
+    });
+
+    it('should return error for empty prompt', function() {
+      const result = ClaudeApiUtils.completeJSON('');
+      expect(result.success).to.be.false;
+      expect(result.error).to.include('non-empty string');
+    });
+
+    it('should return error for non-string prompt', function() {
+      const result = ClaudeApiUtils.completeJSON(123);
+      expect(result.success).to.be.false;
+      expect(result.error).to.include('non-empty string');
+    });
+
+    it('should return error for null prompt', function() {
+      const result = ClaudeApiUtils.completeJSON(null);
+      expect(result.success).to.be.false;
+      expect(result.error).to.include('non-empty string');
+    });
+
+    // Note: Full completeJSON with JSON parsing is tested via integration tests
+    // since it requires actual API responses
+
+  });
+
+  // ============================================================================
+  // EXPORTS
+  // ============================================================================
+
+  module.exports = {
+    name: 'ClaudeApiUtils.unit.test',
+    description: 'Unit tests for ClaudeApiUtils shared Claude API utility'
+  };
+}
+
+__defineModule__(_main);

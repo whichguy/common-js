@@ -1,0 +1,180 @@
+function _main(
+  module = globalThis.__getCurrentModule(),
+  exports = module.exports,
+  log = globalThis.__getModuleLogFunction?.(module) || (() => {})
+) {
+  /**
+   * Module: testFactoryExecution
+   * Auto-wrapped for GAS CommonJS compatibility
+   */
+
+  /**
+   * Test to manually execute CacheStoreAdapter factory
+   * This will help us understand WHY it exports an empty object
+   */
+  function testManualFactoryExecution() {
+    Logger.log('=== MANUAL FACTORY EXECUTION TEST ===');
+    
+    const moduleName = 'gas-queue/CacheStoreAdapter';
+    const results = {
+      moduleName,
+      factoryExists: false,
+      executionSucceeded: false,
+      error: null,
+      exportType: null,
+      exportDetails: null
+    };
+    
+    // Get the factory
+    const factory = globalThis.__moduleFactories__?.[moduleName];
+    if (!factory) {
+      Logger.log(`✗ Factory not found for ${moduleName}`);
+      return results;
+    }
+    
+    results.factoryExists = true;
+    Logger.log(`✓ Factory found for ${moduleName}`);
+    Logger.log(`  Factory type: ${typeof factory}`);
+    Logger.log(`  Factory length: ${factory.length}`);
+    
+    // Create a fresh module object
+    const freshModule = {
+      id: moduleName,
+      exports: {},
+      loaded: false
+    };
+    
+    Logger.log('\n--- Executing Factory Manually ---');
+    try {
+      // Call the factory with the fresh module
+      const factoryResult = factory(freshModule, freshModule.exports);
+      
+      results.executionSucceeded = true;
+      Logger.log('✓ Factory executed without throwing error');
+      
+      // Check what the factory returned
+      if (factoryResult !== undefined) {
+        Logger.log(`  Factory returned: ${typeof factoryResult}`);
+        freshModule.exports = factoryResult;
+      } else {
+        Logger.log('  Factory returned: undefined (using module.exports)');
+      }
+      
+      // Check the final exports
+      results.exportType = typeof freshModule.exports;
+      Logger.log(`  Final export type: ${results.exportType}`);
+      
+      if (results.exportType === 'function') {
+        results.exportDetails = {
+          functionName: freshModule.exports.name,
+          hasGetInstance: freshModule.exports.getInstance !== undefined,
+          staticMethods: Object.getOwnPropertyNames(freshModule.exports).filter(
+            n => n !== 'length' && n !== 'name' && n !== 'prototype'
+          )
+        };
+        Logger.log(`  Function name: ${results.exportDetails.functionName}`);
+        Logger.log(`  Has getInstance: ${results.exportDetails.hasGetInstance}`);
+        Logger.log(`  Static methods: [${results.exportDetails.staticMethods.join(', ')}]`);
+        
+        // Try calling getInstance if it exists
+        if (freshModule.exports.getInstance) {
+          Logger.log('\n--- Testing getInstance() ---');
+          try {
+            const instance = freshModule.exports.getInstance();
+            Logger.log(`✓ getInstance() succeeded`);
+            Logger.log(`  Instance type: ${typeof instance}`);
+            Logger.log(`  Instance constructor: ${instance?.constructor?.name}`);
+          } catch (e) {
+            Logger.log(`✗ getInstance() failed: ${e.toString()}`);
+            Logger.log(`  Stack: ${e.stack}`);
+          }
+        }
+      } else if (results.exportType === 'object') {
+        const keys = Object.keys(freshModule.exports);
+        results.exportDetails = { keys };
+        Logger.log(`  Keys: [${keys.join(', ')}]`);
+        if (keys.length === 0) {
+          Logger.log('  ⚠️  EMPTY EXPORT - Factory completed but exports nothing!');
+        }
+      }
+      
+    } catch (e) {
+      results.error = {
+        message: e.toString(),
+        stack: e.stack
+      };
+      Logger.log(`✗ Factory threw error: ${e.toString()}`);
+      Logger.log(`  Stack trace:`);
+      Logger.log(e.stack);
+    }
+    
+    return results;
+  }
+
+  /**
+   * Test to compare with a working module (PropertiesStoreAdapter)
+   */
+  function testWorkingModuleFactory() {
+    Logger.log('\n=== WORKING MODULE COMPARISON TEST ===');
+    
+    const moduleName = 'gas-queue/PropertiesStoreAdapter';
+    const results = {
+      moduleName,
+      factoryExists: false,
+      executionSucceeded: false,
+      error: null,
+      exportType: null
+    };
+    
+    const factory = globalThis.__moduleFactories__?.[moduleName];
+    if (!factory) {
+      Logger.log(`✗ Factory not found for ${moduleName}`);
+      return results;
+    }
+    
+    results.factoryExists = true;
+    Logger.log(`✓ Factory found for ${moduleName}`);
+    Logger.log(`  Factory length: ${factory.length}`);
+    
+    const freshModule = { id: moduleName, exports: {}, loaded: false };
+    
+    try {
+      const factoryResult = factory(freshModule, freshModule.exports);
+      results.executionSucceeded = true;
+      
+      if (factoryResult !== undefined) {
+        freshModule.exports = factoryResult;
+      }
+      
+      results.exportType = typeof freshModule.exports;
+      Logger.log(`✓ Factory executed successfully`);
+      Logger.log(`  Export type: ${results.exportType}`);
+      Logger.log(`  Has getInstance: ${freshModule.exports?.getInstance !== undefined}`);
+      
+    } catch (e) {
+      results.error = { message: e.toString(), stack: e.stack };
+      Logger.log(`✗ Factory failed: ${e.toString()}`);
+    }
+    
+    return results;
+  }
+
+  /**
+   * Main test runner
+   */
+  function runFactoryExecutionTest() {
+    const results = {
+      cacheStoreAdapter: null,
+      propertiesStoreAdapter: null,
+      runAt: new Date().toISOString()
+    };
+    
+    results.cacheStoreAdapter = testManualFactoryExecution();
+    results.propertiesStoreAdapter = testWorkingModuleFactory();
+    
+    Logger.log('\n=== FACTORY EXECUTION TEST COMPLETE ===');
+    return results;
+  }
+}
+
+__defineModule__(_main);

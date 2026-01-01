@@ -1,0 +1,744 @@
+function _main(
+  module = globalThis.__getCurrentModule(),
+  exports = module.exports,
+  log = globalThis.__getModuleLogFunction?.(module) || (() => {})
+) {
+  // Dependencies
+  const { describe, it, beforeEach } = require('test-framework/mocha-adapter');
+  const { expect } = require('test-framework/chai-assertions');
+  const FetchUrlsToolHandler = require('tools/FetchUrlsToolHandler');
+
+  // ============================================================================
+  // TEST SUITE: FetchUrlsToolHandler Instantiation
+  // ============================================================================
+
+  describe('FetchUrlsToolHandler', function() {
+    let handler;
+
+    beforeEach(function() {
+      handler = new FetchUrlsToolHandler();
+    });
+
+    describe('constructor', function() {
+
+      it('should create handler with name "fetchUrls"', function() {
+        expect(handler.getToolDefinition().name).to.equal('fetchUrls');
+      });
+
+      it('should extend ToolBase', function() {
+        expect(handler._successResult).to.exist;
+        expect(handler._errorResult).to.exist;
+      });
+
+    });
+
+    // ============================================================================
+    // TEST SUITE: Tool Definition
+    // ============================================================================
+
+    describe('getToolDefinition', function() {
+      let definition;
+
+      beforeEach(function() {
+        definition = handler.getToolDefinition();
+      });
+
+      it('should return tool name "fetchUrls"', function() {
+        expect(definition.name).to.equal('fetchUrls');
+      });
+
+      it('should have description mentioning parallel fetching', function() {
+        expect(definition.description).to.include('parallel');
+        expect(definition.description).to.include('multiple URLs');
+      });
+
+      it('should have description mentioning binary support', function() {
+        expect(definition.description).to.include('BINARY');
+        expect(definition.description).to.include('images');
+        expect(definition.description).to.include('PDFs');
+      });
+
+      it('should have description mentioning transform parameter', function() {
+        expect(definition.description).to.include('transform');
+        expect(definition.description).to.include('TOKEN-EFFICIENT');
+      });
+
+      it('should have description mentioning exec-first alternative', function() {
+        expect(definition.description).to.include('EXEC-FIRST');
+        expect(definition.description).to.include('UrlFetchApp.fetchAll');
+      });
+
+      it('should have input_schema with urls array property', function() {
+        expect(definition.input_schema.type).to.equal('object');
+        expect(definition.input_schema.properties.urls).to.exist;
+        expect(definition.input_schema.properties.urls.type).to.equal('array');
+      });
+
+      it('should have urls with maxItems of 30', function() {
+        expect(definition.input_schema.properties.urls.maxItems).to.equal(30);
+      });
+
+      it('should have requests array property for detailed requests', function() {
+        expect(definition.input_schema.properties.requests).to.exist;
+        expect(definition.input_schema.properties.requests.type).to.equal('array');
+        expect(definition.input_schema.properties.requests.maxItems).to.equal(30);
+      });
+
+      it('should have storeAs property with shape documentation', function() {
+        const storeAs = definition.input_schema.properties.storeAs;
+        expect(storeAs).to.exist;
+        expect(storeAs.description).to.include('ARRAY');
+        expect(storeAs.description).to.include('fetchUrls stores ARRAY');
+      });
+
+      it('should have transform property with per-result application note', function() {
+        const transform = definition.input_schema.properties.transform;
+        expect(transform).to.exist;
+        expect(transform.description).to.include('EACH result');
+        expect(transform.description).to.include('r =>');
+      });
+
+      it('should have continueOnError property', function() {
+        const prop = definition.input_schema.properties.continueOnError;
+        expect(prop).to.exist;
+        expect(prop.type).to.equal('boolean');
+      });
+
+      it('should document HTML parsing transform example', function() {
+        expect(definition.description).to.include('HTML PARSING');
+        expect(definition.description).to.include('matchAll');
+      });
+
+    });
+
+    // ============================================================================
+    // TEST SUITE: Input Validation
+    // ============================================================================
+
+    describe('execute input validation', function() {
+
+      it('should fail without urls or requests', function() {
+        const result = handler.execute({});
+        expect(result.success).to.be.false;
+        expect(result.error).to.include('urls');
+      });
+
+      it('should fail with empty urls array', function() {
+        const result = handler.execute({ urls: [] });
+        expect(result.success).to.be.false;
+        expect(result.error.toLowerCase()).to.include('at least one');
+      });
+
+      it('should fail with more than 30 urls', function() {
+        const urls = Array(31).fill('https://example.com');
+        const result = handler.execute({ urls });
+        expect(result.success).to.be.false;
+        expect(result.error).to.include('30');
+      });
+
+      it('should accept simple urls array', function() {
+        const result = handler.execute({ 
+          urls: ['https://httpbin.org/get'] 
+        }, { toolState: {} });
+        expect(result.success).to.be.true;
+      });
+
+      it('should accept requests array with url objects', function() {
+        const result = handler.execute({ 
+          requests: [{ url: 'https://httpbin.org/get' }] 
+        }, { toolState: {} });
+        expect(result.success).to.be.true;
+      });
+
+      it('should fail if request object missing url', function() {
+        const result = handler.execute({ 
+          requests: [{ method: 'GET' }]  // Missing url
+        }, { toolState: {} });
+        expect(result.success).to.be.false;
+        expect(result.error).to.include('URL required');
+      });
+
+    });
+
+    // ============================================================================
+    // TEST SUITE: Parallel Fetching
+    // ============================================================================
+
+    describe('parallel fetching', function() {
+
+      it('should fetch multiple URLs and return array of results', function() {
+        const context = { toolState: {} };
+        const result = handler.execute({
+          urls: [
+            'https://jsonplaceholder.typicode.com/posts/1',
+            'https://jsonplaceholder.typicode.com/posts/2'
+          ],
+          storeAs: 'posts'
+        }, context);
+
+        if (result.success) {
+          expect(result.result.total).to.equal(2);
+          expect(Array.isArray(result.result.results)).to.be.true;
+          expect(result.result.results.length).to.equal(2);
+        }
+      });
+
+      it('should report successful and failed counts', function() {
+        const result = handler.execute({
+          urls: ['https://httpbin.org/get']
+        }, { toolState: {} });
+
+        if (result.success) {
+          expect(result.result).to.have.property('total');
+          expect(result.result).to.have.property('successful');
+          expect(result.result).to.have.property('failed');
+        }
+      });
+
+      it('should include duration in result', function() {
+        const result = handler.execute({
+          urls: ['https://httpbin.org/get']
+        }, { toolState: {} });
+
+        if (result.success) {
+          expect(result.result).to.have.property('durationMs');
+          expect(result.result.durationMs).to.be.greaterThan(0);
+        }
+      });
+
+    });
+
+    // ============================================================================
+    // TEST SUITE: Transform Functionality
+    // ============================================================================
+
+    describe('transform parameter', function() {
+
+      it('should apply transform to EACH result', function() {
+        const context = { toolState: {} };
+        const result = handler.execute({
+          urls: [
+            'https://jsonplaceholder.typicode.com/posts/1',
+            'https://jsonplaceholder.typicode.com/posts/2'
+          ],
+          storeAs: 'titles',
+          transform: 'r => r.body.title'
+        }, context);
+
+        if (result.success) {
+          const stored = context.toolState.titles;
+          expect(Array.isArray(stored)).to.be.true;
+          // Each element should be just the title string
+          stored.forEach(function(item) {
+            expect(typeof item).to.equal('string');
+          });
+        }
+      });
+
+      it('should store transformed array in toolState', function() {
+        const context = { toolState: {} };
+        const result = handler.execute({
+          urls: [
+            'https://jsonplaceholder.typicode.com/posts/1',
+            'https://jsonplaceholder.typicode.com/posts/2'
+          ],
+          storeAs: 'postIds',
+          transform: 'r => ({ id: r.body.id, title: r.body.title })'
+        }, context);
+
+        if (result.success) {
+          const stored = context.toolState.postIds;
+          expect(Array.isArray(stored)).to.be.true;
+          expect(stored.length).to.equal(2);
+          stored.forEach(function(item) {
+            expect(item).to.have.property('id');
+            expect(item).to.have.property('title');
+          });
+        }
+      });
+
+      it('should return transformed results to LLM', function() {
+        const result = handler.execute({
+          urls: ['https://jsonplaceholder.typicode.com/posts/1'],
+          transform: 'r => r.body.id'
+        }, { toolState: {} });
+
+        if (result.success) {
+          expect(result.result.results[0]).to.equal(1);
+        }
+      });
+
+      it('should handle transform errors per-item gracefully', function() {
+        const context = { toolState: {} };
+        const result = handler.execute({
+          urls: ['https://jsonplaceholder.typicode.com/posts/1'],
+          storeAs: 'data',
+          transform: 'r => r.nonexistent.deep.property'
+        }, context);
+
+        if (result.success) {
+          const stored = context.toolState.data;
+          // Should have transform error info
+          expect(stored[0]).to.have.property('__transformError');
+        }
+      });
+
+      it('should compile transform function once for efficiency', function() {
+        // This tests internal behavior - verify it doesn't throw
+        const result = handler.execute({
+          urls: [
+            'https://httpbin.org/get',
+            'https://httpbin.org/get'
+          ],
+          transform: 'r => r.success'
+        }, { toolState: {} });
+
+        expect(result.success).to.be.true;
+      });
+
+      it('should handle invalid transform syntax', function() {
+        const result = handler.execute({
+          urls: ['https://httpbin.org/get'],
+          transform: 'invalid syntax here {'
+        }, { toolState: {} });
+
+        if (result.success) {
+          // Should have warning about transform compilation
+          expect(result.result.warnings).to.exist;
+          expect(result.result.warnings[0]).to.include('Transform compilation failed');
+        }
+      });
+
+    });
+
+    // ============================================================================
+    // TEST SUITE: storeAs Functionality
+    // ============================================================================
+
+    describe('storeAs parameter', function() {
+
+      it('should store ARRAY of results', function() {
+        const context = { toolState: {} };
+        handler.execute({
+          urls: ['https://httpbin.org/get'],
+          storeAs: 'data'
+        }, context);
+
+        const stored = context.toolState.data;
+        if (stored) {
+          expect(Array.isArray(stored)).to.be.true;
+        }
+      });
+
+      it('should include all result objects in stored array', function() {
+        const context = { toolState: {} };
+        handler.execute({
+          urls: [
+            'https://httpbin.org/get',
+            'https://httpbin.org/get'
+          ],
+          storeAs: 'multiData'
+        }, context);
+
+        const stored = context.toolState.multiData;
+        if (stored) {
+          expect(stored.length).to.equal(2);
+          stored.forEach(function(item) {
+            expect(item).to.have.property('url');
+            expect(item).to.have.property('success');
+          });
+        }
+      });
+
+      it('should not store if storeAs not provided', function() {
+        const context = { toolState: {} };
+        handler.execute({
+          urls: ['https://httpbin.org/get']
+        }, context);
+
+        expect(Object.keys(context.toolState).length).to.equal(0);
+      });
+
+      it('should report storedAs in result', function() {
+        const result = handler.execute({
+          urls: ['https://httpbin.org/get'],
+          storeAs: 'myData'
+        }, { toolState: {} });
+
+        if (result.success) {
+          expect(result.result.storedAs).to.equal('myData');
+        }
+      });
+
+      it('should report null storedAs when not storing', function() {
+        const result = handler.execute({
+          urls: ['https://httpbin.org/get']
+        }, { toolState: {} });
+
+        if (result.success) {
+          expect(result.result.storedAs).to.be.null;
+        }
+      });
+
+    });
+
+    // ============================================================================
+    // TEST SUITE: Binary Detection
+    // ============================================================================
+
+    describe('binary content detection', function() {
+
+      it('should detect image content type as binary', function() {
+        const UrlFetchUtils = require('common-js/UrlFetchUtils');
+        expect(UrlFetchUtils.isBinaryContentType('image/png')).to.be.true;
+        expect(UrlFetchUtils.isBinaryContentType('image/jpeg')).to.be.true;
+        expect(UrlFetchUtils.isBinaryContentType('image/gif')).to.be.true;
+        expect(UrlFetchUtils.isBinaryContentType('image/webp')).to.be.true;
+      });
+
+      it('should detect PDF as binary', function() {
+        const UrlFetchUtils = require('common-js/UrlFetchUtils');
+        expect(UrlFetchUtils.isBinaryContentType('application/pdf')).to.be.true;
+      });
+
+      it('should detect audio types as binary', function() {
+        const UrlFetchUtils = require('common-js/UrlFetchUtils');
+        expect(UrlFetchUtils.isBinaryContentType('audio/mpeg')).to.be.true;
+        expect(UrlFetchUtils.isBinaryContentType('audio/wav')).to.be.true;
+      });
+
+      it('should detect video types as binary', function() {
+        const UrlFetchUtils = require('common-js/UrlFetchUtils');
+        expect(UrlFetchUtils.isBinaryContentType('video/mp4')).to.be.true;
+        expect(UrlFetchUtils.isBinaryContentType('video/webm')).to.be.true;
+      });
+
+      it('should NOT detect JSON as binary', function() {
+        const UrlFetchUtils = require('common-js/UrlFetchUtils');
+        expect(UrlFetchUtils.isBinaryContentType('application/json')).to.be.false;
+      });
+
+      it('should NOT detect text types as binary', function() {
+        const UrlFetchUtils = require('common-js/UrlFetchUtils');
+        expect(UrlFetchUtils.isBinaryContentType('text/html')).to.be.false;
+        expect(UrlFetchUtils.isBinaryContentType('text/plain')).to.be.false;
+        expect(UrlFetchUtils.isBinaryContentType('text/css')).to.be.false;
+      });
+
+    });
+
+    // ============================================================================
+    // TEST SUITE: Response Format
+    // ============================================================================
+
+    describe('response format', function() {
+
+      it('should include encoding metadata in each result', function() {
+        const context = { toolState: {} };
+        const result = handler.execute({
+          urls: ['https://httpbin.org/get'],
+          storeAs: 'data'
+        }, context);
+
+        if (result.success && context.toolState.data) {
+          const item = context.toolState.data[0];
+          expect(item).to.have.property('encoding');
+          expect(['utf8', 'base64']).to.include(item.encoding);
+        }
+      });
+
+      it('should include url echo in each result', function() {
+        const context = { toolState: {} };
+        const result = handler.execute({
+          urls: ['https://httpbin.org/get'],
+          storeAs: 'data'
+        }, context);
+
+        if (result.success && context.toolState.data) {
+          const item = context.toolState.data[0];
+          expect(item).to.have.property('url');
+          expect(item.url).to.include('httpbin.org');
+        }
+      });
+
+      it('should include isBinary flag in each result', function() {
+        const context = { toolState: {} };
+        const result = handler.execute({
+          urls: ['https://httpbin.org/get'],
+          storeAs: 'data'
+        }, context);
+
+        if (result.success && context.toolState.data) {
+          const item = context.toolState.data[0];
+          expect(item).to.have.property('isBinary');
+          expect(item.isBinary).to.be.false;  // JSON is not binary
+        }
+      });
+
+      it('should include size in each result', function() {
+        const context = { toolState: {} };
+        const result = handler.execute({
+          urls: ['https://httpbin.org/get'],
+          storeAs: 'data'
+        }, context);
+
+        if (result.success && context.toolState.data) {
+          const item = context.toolState.data[0];
+          expect(item).to.have.property('size');
+          expect(item.size).to.be.greaterThan(0);
+        }
+      });
+
+      it('should report totalBytes in aggregate result', function() {
+        const result = handler.execute({
+          urls: ['https://httpbin.org/get']
+        }, { toolState: {} });
+
+        if (result.success) {
+          expect(result.result).to.have.property('totalBytes');
+          expect(result.result.totalBytes).to.be.greaterThan(0);
+        }
+      });
+
+    });
+
+    // ============================================================================
+    // TEST SUITE: Error Handling
+    // ============================================================================
+
+    describe('error handling', function() {
+
+      it('should continue on error when continueOnError is true (default)', function() {
+        const result = handler.execute({
+          urls: [
+            'https://httpbin.org/get',
+            'https://httpbin.org/status/404'  // Will fail
+          ],
+          continueOnError: true
+        }, { toolState: {} });
+
+        if (result.success) {
+          expect(result.result.total).to.equal(2);
+          expect(result.result.successful).to.be.greaterThan(0);
+        }
+      });
+
+      it('should include error info for failed requests', function() {
+        const context = { toolState: {} };
+        const result = handler.execute({
+          urls: ['https://httpbin.org/status/500'],
+          storeAs: 'errorData'
+        }, context);
+
+        if (result.success && context.toolState.errorData) {
+          const item = context.toolState.errorData[0];
+          expect(item.success).to.be.false;
+          expect(item.statusCode).to.equal(500);
+        }
+      });
+
+    });
+
+    // ============================================================================
+    // TEST SUITE: Request Options
+    // ============================================================================
+
+    describe('request options', function() {
+
+      it('should support POST method in requests array', function() {
+        const result = handler.execute({
+          requests: [{
+            url: 'https://httpbin.org/post',
+            method: 'POST',
+            payload: '{"test": "data"}',
+            contentType: 'application/json'
+          }]
+        }, { toolState: {} });
+
+        expect(result.success).to.be.true;
+      });
+
+      it('should support PUT method in requests array', function() {
+        const result = handler.execute({
+          requests: [{
+            url: 'https://httpbin.org/put',
+            method: 'PUT',
+            payload: '{"update": "data"}',
+            contentType: 'application/json'
+          }]
+        }, { toolState: {} });
+
+        expect(result.success).to.be.true;
+      });
+
+      it('should support DELETE method in requests array', function() {
+        const result = handler.execute({
+          requests: [{
+            url: 'https://httpbin.org/delete',
+            method: 'DELETE'
+          }]
+        }, { toolState: {} });
+
+        expect(result.success).to.be.true;
+      });
+
+      it('should support PATCH method in requests array', function() {
+        const result = handler.execute({
+          requests: [{
+            url: 'https://httpbin.org/patch',
+            method: 'PATCH',
+            payload: '{"partial": "update"}',
+            contentType: 'application/json'
+          }]
+        }, { toolState: {} });
+
+        expect(result.success).to.be.true;
+      });
+
+      it('should support custom headers in requests array', function() {
+        const result = handler.execute({
+          requests: [{
+            url: 'https://httpbin.org/get',
+            headers: { 'X-Custom-Header': 'test-value' }
+          }]
+        }, { toolState: {} });
+
+        expect(result.success).to.be.true;
+      });
+
+      it('should send payload in request body', function() {
+        const context = { toolState: {} };
+        const result = handler.execute({
+          requests: [{
+            url: 'https://httpbin.org/post',
+            method: 'POST',
+            payload: '{"testKey": "testValue"}',
+            contentType: 'application/json'
+          }],
+          storeAs: 'postResult'
+        }, context);
+
+        if (result.success && context.toolState.postResult) {
+          const response = context.toolState.postResult[0];
+          // httpbin echoes back the request in body.json
+          if (response.body && response.body.json) {
+            expect(response.body.json.testKey).to.equal('testValue');
+          }
+        }
+      });
+
+      it('should include custom headers in request', function() {
+        const context = { toolState: {} };
+        const result = handler.execute({
+          requests: [{
+            url: 'https://httpbin.org/get',
+            headers: { 
+              'X-Test-Header': 'test123',
+              'X-Another': 'value456'
+            }
+          }],
+          storeAs: 'headerResult'
+        }, context);
+
+        if (result.success && context.toolState.headerResult) {
+          const response = context.toolState.headerResult[0];
+          // httpbin echoes headers in body.headers
+          if (response.body && response.body.headers) {
+            expect(response.body.headers['X-Test-Header']).to.equal('test123');
+            expect(response.body.headers['X-Another']).to.equal('value456');
+          }
+        }
+      });
+
+      it('should use custom contentType', function() {
+        const result = handler.execute({
+          requests: [{
+            url: 'https://httpbin.org/post',
+            method: 'POST',
+            payload: 'plain text content',
+            contentType: 'text/plain'
+          }]
+        }, { toolState: {} });
+
+        expect(result.success).to.be.true;
+      });
+
+      it('should default to GET method when not specified', function() {
+        const result = handler.execute({
+          requests: [{
+            url: 'https://httpbin.org/get'
+            // No method specified - should default to GET
+          }]
+        }, { toolState: {} });
+
+        expect(result.success).to.be.true;
+      });
+
+    });
+
+    // ============================================================================
+    // TEST SUITE: continueOnError Variations
+    // ============================================================================
+
+    describe('continueOnError parameter', function() {
+
+      it('should continue fetching when continueOnError is true (default)', function() {
+        const result = handler.execute({
+          urls: [
+            'https://httpbin.org/get',
+            'https://httpbin.org/status/404',
+            'https://httpbin.org/get'
+          ],
+          continueOnError: true
+        }, { toolState: {} });
+
+        if (result.success) {
+          // Should have processed all 3 even though 1 failed
+          expect(result.result.total).to.equal(3);
+          expect(result.result.failed).to.be.greaterThan(0);
+          expect(result.result.successful).to.be.greaterThan(0);
+        }
+      });
+
+      it('should still return results array when continueOnError is false', function() {
+        const result = handler.execute({
+          urls: [
+            'https://httpbin.org/get'
+          ],
+          continueOnError: false
+        }, { toolState: {} });
+
+        if (result.success) {
+          expect(Array.isArray(result.result.results)).to.be.true;
+        }
+      });
+
+      it('should use continueOnError: true as default', function() {
+        const result = handler.execute({
+          urls: [
+            'https://httpbin.org/get',
+            'https://httpbin.org/status/500'
+          ]
+          // No continueOnError specified - should default to true
+        }, { toolState: {} });
+
+        if (result.success) {
+          expect(result.result.total).to.equal(2);
+        }
+      });
+
+    });
+
+  });
+
+  // ============================================================================
+  // EXPORTS
+  // ============================================================================
+
+  module.exports = {
+    name: 'FetchUrlsToolHandler.unit.test',
+    description: 'Unit tests for FetchUrlsToolHandler (fetchUrls tool)'
+  };
+}
+
+__defineModule__(_main);

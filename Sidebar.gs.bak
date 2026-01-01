@@ -1,0 +1,2646 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600&display=swap');
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Google Sans', 'Product Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      background: #f8f9fa;
+      color: #202124;
+      letter-spacing: 0.01em;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      background: #1a73e8;
+      color: white;
+      padding: 12px 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    }
+
+    .header h1 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 0;
+      border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+      position: relative;
+    }
+
+    .tab {
+      background: transparent;
+      border: none;
+      color: rgba(255, 255, 255, 0.8);
+      padding: 8px 16px;
+      border-radius: 0;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      position: relative;
+      border-bottom: none;
+    }
+
+    .tab:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: white;
+      transform: translateY(-1px);
+    }
+
+    .tab.active {
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      font-weight: 600;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 4px;
+      align-items: center;
+    }
+
+    .conversation-dropdown {
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 11px;
+      color: #1f1f1f;
+      cursor: pointer;
+      max-width: 200px;
+      flex: 1;
+      font-family: inherit;
+    }
+
+    .conversation-dropdown:focus {
+      outline: none;
+      border-color: rgba(255, 255, 255, 0.6);
+      box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+    }
+
+    .icon-btn {
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 4px;
+      padding: 4px 6px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: white;
+      min-width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .icon-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: translateY(-1px);
+    }
+
+    .icon-btn:active {
+      transform: translateY(0);
+    }
+
+    .icon-btn .material-symbols-outlined {
+      font-size: 18px;
+      font-variation-settings:
+        'FILL' 0,
+        'wght' 400,
+        'GRAD' 0,
+        'opsz' 20;
+    }
+
+    button {
+      background: white;
+      border: 1px solid #dadce0;
+      border-radius: 10px;
+      padding: 10px 18px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      font-weight: 500;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+
+    button:hover {
+      background: #f1f3f4;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+      transform: translateY(-1px) scale(1.02);
+    }
+
+    button:active {
+      transform: translateY(0) scale(0.98);
+    }
+
+    button.primary {
+      background: #1a73e8;
+      color: white;
+      border: none;
+    }
+
+    button.primary:hover {
+      background: #1765cc;
+      box-shadow: 0 4px 8px rgba(26, 115, 232, 0.25);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .tab-content {
+      display: none;
+      flex: 1;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .tab-content.active {
+      display: flex;
+    }
+
+    .chat-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .config-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+
+    .config-section {
+      background: white;
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+      border: 1px solid #e8eaed;
+    }
+
+    .config-section h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #5f6368;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group:last-child {
+      margin-bottom: 0;
+    }
+
+    label {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      color: #1f1f1f;
+      margin-bottom: 8px;
+    }
+
+    input[type="text"],
+    input[type="password"] {
+      width: 100%;
+      border: 1px solid #dadce0;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-family: inherit;
+      font-size: 14px;
+    }
+
+    input[type="text"]:focus,
+    input[type="password"]:focus {
+      outline: none;
+      border-color: #4285f4;
+      box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.1);
+    }
+
+    .help-text {
+      font-size: 12px;
+      color: #5f6368;
+      margin-top: 4px;
+    }
+
+    .message {
+      background: white;
+      border-radius: 18px;
+      padding: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+      border: 1px solid #e8eaed;
+      position: relative;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .message.user {
+      background: #d2e3fc;
+      border-color: #aecbfa;
+    }
+
+    .message.assistant {
+      background: white;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+    }
+
+    /* Animated border for actively responding Claude message */
+    .message.assistant.responding {
+      border: 2px solid #1a73e8;
+      animation: borderPulse 2s ease-in-out infinite;
+      will-change: border-color, box-shadow;
+    }
+
+    @keyframes borderPulse {
+      0%, 100% { 
+        border-color: #1a73e8; 
+        box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2), 0 0 12px rgba(26, 115, 232, 0.3);
+      }
+      50% { 
+        border-color: #1765cc; 
+        box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.3), 0 0 16px rgba(26, 115, 232, 0.4);
+      }
+    }
+
+    /* Accessibility: Disable animation for users who prefer reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      .message.assistant.responding {
+        animation: none;
+        border: 2px solid #4285f4;
+        box-shadow: 0 0 4px 1px rgba(66, 133, 244, 0.5);
+      }
+    }
+
+    .message-label {
+      font-size: 9px;
+      font-weight: 600;
+      color: #5f6368;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .message-content {
+      color: #1f1f1f;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+
+    /* Run Again Button */
+    .message-run-again-btn {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      background: rgba(66, 133, 244, 0.1);
+      border: none;
+      border-radius: 4px;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 11px;
+      color: #4285f4;
+      transition: all 0.2s;
+      opacity: 0.6;
+    }
+
+    .message-run-again-btn:hover {
+      opacity: 1;
+      background: rgba(66, 133, 244, 0.2);
+      transform: scale(1.1);
+    }
+
+    .message-run-again-btn:active {
+      transform: scale(0.95);
+    }
+
+    /* Click animation */
+    .message-run-again-btn.clicked {
+      animation: btnClick 0.3s ease;
+    }
+
+    @keyframes btnClick {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.2) rotate(180deg); }
+    }
+
+    .message-images {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .message-image-thumb {
+      width: 80px;
+      height: 80px;
+      object-fit: cover;
+      border-radius: 6px;
+      border: 1px solid #e8eaed;
+      cursor: pointer;
+    }
+
+    /* Thinking bubble styles - Two-box layout with three states */
+    .thinking-bubble {
+      margin-bottom: 8px;
+      transition: all 0.3s ease;
+    }
+
+    .thinking-bubble-header {
+      background: #fef7e0;
+      border: 1px solid #f9e79f;
+      border-radius: 8px;
+      font-weight: 600;
+      color: #7d6608;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+      min-height: 20px;
+      padding: 4px 10px;
+      font-size: 10px;
+      transition: all 0.3s ease;
+    }
+
+    .thinking-title {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .thinking-chevron {
+      font-size: 14px;
+      transition: transform 0.3s ease;
+      display: inline-block;
+    }
+
+    .thinking-bubble-preview {
+      background: #fef7e0;
+      border: 1px solid #f9e79f;
+      border-top: none;
+      border-radius: 0 0 8px 8px;
+      padding: 4px 12px;
+      margin-top: -1px;
+      font-size: 13px;
+      color: #5f4d00;
+      line-height: 1.6;
+      overflow: hidden;
+      white-space: pre-wrap;
+      display: none;
+    }
+
+    .thinking-content {
+      background: #fef7e0;
+      border: 1px solid #f9e79f;
+      border-top: none;
+      border-radius: 0 0 8px 8px;
+      padding: 8px 12px;
+      margin-top: -1px;
+      font-size: 13px;
+      color: #5f4d00;
+      line-height: 1.6;
+      max-height: 300px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      display: none;
+    }
+
+    /* State: collapsed - only header visible */
+    .thinking-bubble.collapsed .thinking-bubble-preview {
+      display: none;
+    }
+
+    .thinking-bubble.collapsed .thinking-content {
+      display: none;
+    }
+
+    .thinking-bubble.collapsed .thinking-chevron {
+      transform: rotate(0deg); /* Right arrow ► */
+    }
+
+    .thinking-bubble.collapsed .thinking-bubble-header {
+      border-radius: 8px; /* Full rounded when solo */
+    }
+
+    /* State: last-message - header + preview box */
+    .thinking-bubble.last-message .thinking-bubble-preview {
+      display: block;
+    }
+
+    .thinking-bubble.last-message .thinking-content {
+      display: none;
+    }
+
+    .thinking-bubble.last-message .thinking-chevron {
+      transform: rotate(0deg); /* Right arrow ► */
+    }
+
+    .thinking-bubble.last-message .thinking-bubble-header {
+      border-radius: 8px 8px 0 0; /* Rounded top only */
+    }
+
+    /* State: full - header + full content (preview hidden) */
+    .thinking-bubble.full .thinking-bubble-preview {
+      display: none;
+    }
+
+    .thinking-bubble.full .thinking-content {
+      display: block;
+    }
+
+    .thinking-bubble.full .thinking-chevron {
+      transform: rotate(90deg); /* Down arrow ▼ */
+    }
+
+    .thinking-bubble.full .thinking-bubble-header {
+      border-radius: 8px 8px 0 0; /* Rounded top only */
+    }
+
+    .thinking-bubble-loading {
+      opacity: 0.7;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* Error bubble styles - Red error theme */
+    .error-bubble {
+      margin-bottom: 8px;
+      transition: all 0.3s ease;
+    }
+
+    .error-bubble-header {
+      background: #fee;
+      border: 1px solid #fcc;
+      border-radius: 8px;
+      font-weight: 600;
+      color: #c00;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+      min-height: 20px;
+      padding: 4px 10px;
+      font-size: 10px;
+      transition: all 0.3s ease;
+    }
+
+    .error-title {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .error-chevron {
+      font-size: 14px;
+      transition: transform 0.3s ease;
+      display: inline-block;
+    }
+
+    .error-bubble-content {
+      background: #fee;
+      border: 1px solid #fcc;
+      border-top: none;
+      border-radius: 0 0 8px 8px;
+      padding: 4px 12px;
+      margin-top: -1px;
+      font-size: 13px;
+      color: #800;
+      line-height: 1.6;
+      max-height: 300px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      display: none;
+    }
+
+    /* Collapsed state - only header */
+    .error-bubble.collapsed .error-bubble-content {
+      display: none;
+    }
+
+    .error-bubble.collapsed .error-chevron {
+      transform: rotate(0deg); /* Right arrow ► */
+    }
+
+    .error-bubble.collapsed .error-bubble-header {
+      border-radius: 8px;
+    }
+
+    /* Expanded state - header + content */
+    .error-bubble.expanded .error-bubble-content {
+      display: block;
+    }
+
+    .error-bubble.expanded .error-chevron {
+      transform: rotate(90deg); /* Down arrow ▼ */
+    }
+
+    .error-bubble.expanded .error-bubble-header {
+      border-radius: 8px 8px 0 0;
+    }
+
+    /* Welcome screen styles */
+    .welcome-screen {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 32px;
+      text-align: center;
+    }
+
+    .welcome-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: #1f1f1f;
+      margin-bottom: 12px;
+    }
+
+    .welcome-subtitle {
+      font-size: 14px;
+      color: #5f6368;
+      margin-bottom: 32px;
+    }
+
+    .welcome-prompts {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      max-width: 600px;
+      width: 100%;
+    }
+
+    .prompt-chip {
+      background: white;
+      border: 1px solid #e8eaed;
+      border-radius: 12px;
+      padding: 16px;
+      font-size: 14px;
+      text-align: left;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+
+    .prompt-chip:hover {
+      background: #f8f9fa;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      transform: translateY(-2px);
+    }
+
+    /* Message Queue Styles */
+    .pending-queue-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 8px;
+      padding: 0;
+    }
+
+    .pending-queue-container:empty {
+      display: none;
+      margin-bottom: 0;
+    }
+
+    .pending-message-chip {
+      background: #e3f2fd;
+      border: 1px solid #90caf9;
+      border-radius: 16px;
+      padding: 6px 12px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Animation when new message added */
+    @keyframes stackIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .pending-message-chip.entering {
+      animation: stackIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    /* Animation when first message is removed (FIFO) */
+    @keyframes slideOutFIFO {
+      0% {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+      }
+      100% {
+        opacity: 0;
+        transform: translateX(100%) scale(0.8);
+      }
+    }
+
+    .pending-message-chip.exiting {
+      animation: slideOutFIFO 0.3s ease-out;
+    }
+
+    .pending-message-preview {
+      color: #1565c0;
+      max-width: 200px;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    .pending-message-position {
+      color: #1976d2;
+      font-weight: 600;
+      font-size: 11px;
+    }
+
+    .pending-message-remove {
+      background: none;
+      border: none;
+      color: #1976d2;
+      cursor: pointer;
+      font-size: 16px;
+      padding: 0;
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: all 0.2s;
+    }
+
+    .pending-message-remove:hover {
+      background: #1976d2;
+      color: white;
+    }
+
+    /* Drag & Drop Styles */
+    .file-drop-zone {
+      border: 2px dashed #dadce0;
+      border-radius: 8px;
+      padding: 8px;
+      text-align: center;
+      margin-bottom: 8px;
+      transition: all 0.2s;
+      cursor: pointer;
+      background: #fafafa;
+    }
+
+    .file-drop-zone.hidden {
+      display: none;
+    }
+
+    .file-drop-zone:hover {
+      border-color: #4285f4;
+      background: #f8f9fa;
+    }
+
+    .file-drop-zone.drag-over {
+      border-color: #4285f4;
+      background: #e8f0fe;
+      border-style: solid;
+    }
+
+    .file-drop-text {
+      font-size: 12px;
+      color: #5f6368;
+    }
+
+    .file-browse-btn {
+      color: #4285f4;
+      font-weight: 600;
+      text-decoration: underline;
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: 13px;
+    }
+
+    .attachment-preview-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .attachment-thumbnail {
+      position: relative;
+      width: 80px;
+      height: 80px;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid #e8eaed;
+    }
+
+    .attachment-thumbnail img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .attachment-remove-btn {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 0;
+      transition: all 0.2s;
+    }
+
+    .attachment-remove-btn:hover {
+      background: rgba(0, 0, 0, 0.9);
+      transform: scale(1.1);
+    }
+
+    .resize-handle {
+      height: 3px;
+      background: rgba(0,0,0,0.1);
+      cursor: ns-resize;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+
+    .resize-handle:hover {
+      height: 4px;
+      background: rgba(0,0,0,0.3);
+    }
+
+    .resize-handle.dragging {
+      background: #1a73e8;
+      height: 4px;
+    }
+
+    .input-container {
+      padding: 2px;
+      background: white;
+      border-top: 1px solid #e8eaed;
+      box-shadow: 0 -2px 8px rgba(0,0,0,0.05);
+      display: flex;
+      flex-direction: column;
+      height: 110px;
+      min-height: 60px;
+      max-height: none;
+      overflow-y: auto;
+    }
+
+    textarea {
+      flex: 1;
+      border: 1px solid #dadce0;
+      border-radius: 8px;
+      padding: 12px;
+      font-family: inherit;
+      font-size: 14px;
+      resize: none;
+      min-height: 44px;
+      overflow-y: auto;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: #4285f4;
+      box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.1);
+    }
+
+    .input-footer {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      margin-top: 6px;
+      margin-bottom: 6px;
+      flex-shrink: 0;
+    }
+
+    .send-btn {
+      background: #4285f4;
+      border: none;
+      border-radius: 4px;
+      padding: 4px 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      color: white;
+      transition: all 0.2s;
+      min-width: 28px;
+      align-self: flex-end;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 1px 2px rgba(66, 133, 244, 0.2);
+      margin-top: 8px;
+    }
+
+    .send-btn:hover {
+      background: #3367d6;
+      transform: scale(1.05);
+      box-shadow: 0 3px 6px rgba(66, 133, 244, 0.4);
+    }
+
+    .send-btn:active {
+      transform: translateY(0);
+    }
+
+    .send-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .status {
+      font-size: 12px;
+      color: #5f6368;
+      transition: opacity 0.3s ease;
+    }
+
+    .status.updating {
+      opacity: 0.6;
+    }
+
+    .status.sending {
+      color: #4285f4;
+      font-weight: 500;
+    }
+
+    .status.error {
+      color: #d93025;
+    }
+
+    .status.success {
+      color: #1e8e3e;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid #e8eaed;
+      border-top-color: #4285f4;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      margin-right: 6px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* ========== DARK MODE SUPPORT ========== */
+    @media (prefers-color-scheme: dark) {
+      body {
+        background: #202124;
+        color: #e8eaed;
+      }
+
+      .header {
+        background: #1a73e8;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+      }
+
+      .tab:hover {
+        background: rgba(255, 255, 255, 0.2);
+      }
+
+      .tab.active {
+        background: rgba(255, 255, 255, 0.25);
+      }
+
+      button {
+        background: #292a2d;
+        border-color: #5f6368;
+        color: #e8eaed;
+      }
+
+      button:hover {
+        background: #3c4043;
+      }
+
+      button.primary {
+        background: #1a73e8;
+        color: white;
+      }
+
+      button.primary:hover {
+        background: #1765cc;
+      }
+
+      .message {
+        background: #292a2d;
+        border-color: #3c4043;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+      }
+
+      .message.user {
+        background: #1a3a52;
+        border-color: #2a4a62;
+      }
+
+      .message.assistant {
+        background: #292a2d;
+      }
+
+      .message.assistant.responding {
+        border-color: #4a9eff;
+      }
+
+      @keyframes borderPulse {
+        0%, 100% { 
+          border-color: #4a9eff;
+          box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.2), 0 0 12px rgba(74, 158, 255, 0.3);
+        }
+        50% { 
+          border-color: #6bb0ff;
+          box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.3), 0 0 16px rgba(74, 158, 255, 0.4);
+        }
+      }
+
+      .thinking-bubble-header {
+        background: #3e3420;
+        border-color: #5a4a2a;
+        color: #f9e79f;
+      }
+
+      .thinking-bubble-preview,
+      .thinking-content {
+        background: #3e3420;
+        border-color: #5a4a2a;
+        color: #f9e79f;
+      }
+
+      .error-bubble-header {
+        background: #4a2020;
+        border-color: #6a3030;
+        color: #ffb3b3;
+      }
+
+      .error-bubble-content {
+        background: #4a2020;
+        border-color: #6a3030;
+        color: #ffb3b3;
+      }
+
+      .config-section {
+        background: #292a2d;
+        border-color: #3c4043;
+      }
+
+      .config-section h3 {
+        color: #9aa0a6;
+      }
+
+      label {
+        color: #e8eaed;
+      }
+
+      input[type="text"],
+      input[type="password"],
+      textarea {
+        background: #292a2d;
+        border-color: #5f6368;
+        color: #e8eaed;
+      }
+
+      input[type="text"]:focus,
+      input[type="password"]:focus,
+      textarea:focus {
+        border-color: #4a9eff;
+        background: #3c4043;
+      }
+
+      .help-text {
+        color: #9aa0a6;
+      }
+
+      .file-drop-zone {
+        background: #292a2d;
+        border-color: #5f6368;
+      }
+
+      .file-drop-zone:hover {
+        border-color: #4a9eff;
+        background: #3c4043;
+      }
+
+      .file-drop-zone.drag-over {
+        border-color: #4a9eff;
+        background: #1a3a52;
+      }
+
+      .file-drop-text {
+        color: #9aa0a6;
+      }
+
+      .pending-message-chip {
+        background: #1a3a52;
+        border-color: #2a4a62;
+      }
+
+      .pending-message-preview {
+        color: #8ab4f8;
+      }
+
+      .pending-message-position {
+        color: #8ab4f8;
+      }
+
+      .pending-message-remove {
+        color: #8ab4f8;
+      }
+
+      .pending-message-remove:hover {
+        background: #4a9eff;
+      }
+
+      .input-container {
+        background: #292a2d;
+        border-top-color: #3c4043;
+        box-shadow: 0 -2px 8px rgba(0,0,0,0.3);
+      }
+
+      .status.error {
+        color: #f28b82;
+      }
+
+      .status.success {
+        color: #81c995;
+      }
+
+      .status.sending {
+        color: #8ab4f8;
+      }
+
+      .spinner {
+        border-color: #5f6368;
+        border-top-color: #8ab4f8;
+      }
+
+      .prompt-chip {
+        background: #292a2d;
+        border-color: #3c4043;
+      }
+
+      .prompt-chip:hover {
+        background: #3c4043;
+      }
+    }
+
+    /* ========== ACCESSIBILITY IMPROVEMENTS ========== */
+    /* Respect user's motion preferences */
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    /* Improved focus indicators for keyboard navigation */
+    button:focus-visible,
+    .tab:focus-visible,
+    .icon-btn:focus-visible {
+      outline: 2px solid #1a73e8;
+      outline-offset: 2px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      button:focus-visible,
+      .tab:focus-visible,
+      .icon-btn:focus-visible {
+        outline-color: #8ab4f8;
+      }
+    }
+
+    input:focus-visible,
+    textarea:focus-visible {
+      outline: 2px solid #1a73e8;
+      outline-offset: 2px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      input:focus-visible,
+      textarea:focus-visible {
+        outline-color: #8ab4f8;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="tabs" role="tablist" aria-label="Main navigation">
+      <button class="tab active" onclick="switchTab('chat')" role="tab" aria-selected="true" aria-controls="chatTab">Chat</button>
+      <button class="tab" onclick="switchTab('config')" role="tab" aria-selected="false" aria-controls="configTab">Config</button>
+    </div>
+    <div class="header-actions">
+      <select id="conversationSelector" class="conversation-dropdown" style="display:none;">
+        <option value="">Select conversation...</option>
+      </select>
+      <button class="icon-btn" onclick="loadThread()" title="Load conversation from sheet">
+        <span class="material-symbols-outlined">history</span>
+      </button>
+      <button class="icon-btn" onclick="saveThread()" title="Save conversation to sheet">
+        <span class="material-symbols-outlined">bookmark_border</span>
+      </button>
+      <button class="icon-btn" onclick="clearChat()" title="Clear conversation">
+        <span class="material-symbols-outlined">restart_alt</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Chat Tab -->
+  <div class="tab-content active" id="chatTab">
+    <div class="chat-container" id="chatContainer"></div>
+
+    <div class="input-container" id="inputContainer">
+      <!-- Resize Handle -->
+      <div class="resize-handle" id="resizeHandle"></div>
+
+      <!-- Attachment Preview -->
+      <div class="attachment-preview-container" id="attachmentPreview"></div>
+
+      <!-- Pending Queue -->
+      <div class="pending-queue-container" id="pendingQueue"></div>
+
+      <!-- Drag & Drop Zone -->
+      <div class="file-drop-zone" id="dropZone">
+        <div class="file-drop-text">
+          Drop images here or <span class="file-browse-btn" onclick="document.getElementById('fileInput').click()">browse</span>
+        </div>
+        <input type="file" id="fileInput" accept="image/jpeg,image/png,image/gif,image/webp" multiple hidden>
+      </div>
+
+      <textarea
+        id="messageInput"
+        placeholder="Type your message..."
+        onkeydown="handleKeyDown(event)"></textarea>
+      <button class="send-btn" onclick="sendMessage()" id="sendBtn">→</button>
+      <div class="input-footer">
+        <div class="status" id="status"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Config Tab -->
+  <div class="tab-content" id="configTab">
+    <div class="config-container">
+      <div class="config-section">
+        <h3>Claude API Configuration</h3>
+        <div class="form-group">
+          <label for="apiKey">API Key</label>
+          <input type="password" id="apiKey" placeholder="sk-ant-api03-...">
+          <div class="help-text">Your Anthropic API key. Get one at console.anthropic.com</div>
+        </div>
+        <button class="primary" onclick="saveConfig()">Save Configuration</button>
+      </div>
+      <div class="status" id="configStatus"></div>
+    </div>
+  </div>
+
+  <script>
+    let conversationMessages = [];
+    let isSending = false;
+    let currentTab = 'chat';
+    let currentRequestId = null;
+    let currentConversationId = null;
+    let thinkingBubbles = new Map();
+    let thinkingBubbleStates = new Map(); // Track: 'collapsed' | 'last-message' | 'full'
+    let thinkingBubbleUserInteracted = new Map(); // Track if user manually toggled
+    let thinkingBubbleFinalized = new Map(); // Track if bubble is finalized (won't receive new thinking)
+    let errorBubbles = new Map(); // Track error bubbles by requestId
+    let errorBubbleStates = new Map(); // Track: 'collapsed' | 'expanded'
+
+    // ========== MESSAGE QUEUE STATE ==========
+    let messageQueue = [];
+    let isProcessingQueue = false;
+
+    // ========== INPUT HISTORY STATE ==========
+    let inputHistory = [];
+    let historyIndex = -1;
+    let currentDraft = '';
+    const MAX_HISTORY = 80;
+
+    // ========== MULTIMODAL STATE ==========
+    let attachedFiles = [];
+
+    // ========== POLLING BACKOFF STATE ==========
+    let pollInterval = 300; // Start at 300ms
+    let consecutiveErrors = 0;
+    const MAX_POLL_INTERVAL = 5000; // Cap at 5 seconds
+
+    // ========== TIMING STATE ==========
+    let requestStartTime = null;
+    let requestEndTime = null;
+    let sendingTimer = null;
+    let relativeTimeTimer = null;
+    let lastTokenCount = 0;
+    let lastStatusText = '';
+
+    // ========== RESPONDING ANIMATION STATE ==========
+    let respondingTimeouts = new Map(); // Track setTimeout IDs for cleanup
+    const RESPONDING_ANIMATION_DURATION = 3000; // 3 seconds
+
+    // Initialize when DOM is ready
+    $(document).ready(function() {
+      loadConfig();
+      loadHistoryFromStorage();
+      setupDragAndDrop();
+      setupResizeHandle();
+      loadConversationsList(); // Load saved conversations for dropdown
+      
+      // Event delegation for run-again buttons
+      $(document).on('click', '.message-run-again-btn', function(e) {
+        e.stopPropagation();
+        runAgainMessage(this);
+      });
+      
+      if (conversationMessages.length === 0) {
+        sendInitialGreeting(); // Auto-send personalized greeting from Claude
+      }
+    });
+
+    // ========== CONVERSATION MANAGEMENT FUNCTIONS ==========
+
+    function loadConversationsList() {
+      google.script.run
+        .withSuccessHandler(function(conversations) {
+          const $selector = $('#conversationSelector');
+          
+          // Clear existing options except first
+          $selector.find('option:not(:first)').remove();
+          
+          if (conversations && conversations.length > 0) {
+            // Populate dropdown
+            conversations.forEach(conv => {
+              const option = $('<option></option>')
+                .val(conv.id)
+                .text(conv.title);
+              $selector.append(option);
+            });
+            
+            // Show dropdown
+            $selector.show();
+          } else {
+            // Hide dropdown if no conversations
+            $selector.hide();
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error loading conversations list:', error);
+        })
+        .exec_api(null, 'sheets-chat/UISupport', 'listConversations');
+    }
+
+    // ========== FORMATTING HELPER FUNCTIONS ==========
+
+    function formatTokens(count) {
+      if (count < 1000) {
+        return count + ' tokens';
+      } else if (count < 1000000) {
+        return (count / 1000).toFixed(2) + 'K tokens';
+      } else {
+        return (count / 1000000).toFixed(2) + 'M tokens';
+      }
+    }
+
+    function formatRelativeTime(timestamp) {
+      const seconds = Math.floor((Date.now() - timestamp) / 1000);
+      if (seconds < 5) return 'just now';
+      if (seconds < 60) return seconds + ' seconds ago';
+      const minutes = Math.floor(seconds / 60);
+      if (minutes === 1) return '1 minute ago';
+      if (minutes < 60) return minutes + ' minutes ago';
+      const hours = Math.floor(minutes / 60);
+      if (hours === 1) return '1 hour ago';
+      return hours + ' hours ago';
+    }
+
+    // ========== TIMER MANAGEMENT FUNCTIONS ==========
+
+    function startSendingTimer() {
+      if (sendingTimer) clearInterval(sendingTimer);
+      
+      sendingTimer = setInterval(() => {
+        if (!requestStartTime || !isSending) return;
+        const elapsed = Math.round((Date.now() - requestStartTime) / 1000); // Round to whole seconds
+        const newText = `${elapsed}s | ... | sending`;
+        
+        // Only pulse if text actually changed
+        if (newText !== lastStatusText) {
+          const $status = $('#status');
+          $status.addClass('updating');
+          setTimeout(() => $status.removeClass('updating'), 150);
+          lastStatusText = newText;
+        }
+        
+        updateStatus('sending', newText);
+      }, 1000); // 1s updates while sending - responsive feedback
+    }
+
+    function stopSendingTimer() {
+      if (sendingTimer) {
+        clearInterval(sendingTimer);
+        sendingTimer = null;
+      }
+    }
+
+    function startRelativeTimeTimer() {
+      if (relativeTimeTimer) clearInterval(relativeTimeTimer);
+      
+      relativeTimeTimer = setInterval(() => {
+        if (!requestEndTime) return;
+        const duration = Math.round((requestEndTime - requestStartTime) / 1000); // Round to whole seconds
+        const tokens = formatTokens(lastTokenCount);
+        const relTime = formatRelativeTime(requestEndTime);
+        const newText = `${duration}s | ${tokens} | ${relTime}`;
+        
+        // Only pulse if text actually changed
+        if (newText !== lastStatusText) {
+          const $status = $('#status');
+          $status.addClass('updating');
+          setTimeout(() => $status.removeClass('updating'), 150);
+          lastStatusText = newText;
+        }
+        
+        updateStatus('', newText);
+      }, 5000); // 5s updates for relative time - doesn't need precision
+    }
+
+    function stopRelativeTimeTimer() {
+      if (relativeTimeTimer) {
+        clearInterval(relativeTimeTimer);
+        relativeTimeTimer = null;
+      }
+    }
+
+    // ========== INPUT HISTORY FUNCTIONS ==========
+
+    function loadHistoryFromStorage() {
+      try {
+        const storageKey = 'claude-chat-history';
+        const historyJson = localStorage.getItem(storageKey);
+        if (historyJson) {
+          inputHistory = JSON.parse(historyJson);
+        }
+      } catch (error) {
+        console.error('Error loading history:', error);
+      }
+    }
+
+    function saveHistoryToStorage() {
+      try {
+        const storageKey = 'claude-chat-history';
+        localStorage.setItem(storageKey, JSON.stringify(inputHistory));
+      } catch (error) {
+        console.error('Error saving history:', error);
+      }
+    }
+
+    function addToHistory(text) {
+      if (!text || !text.trim()) return;
+      
+      // Add to end of history
+      inputHistory.push(text);
+      
+      // Keep only last 80
+      if (inputHistory.length > MAX_HISTORY) {
+        inputHistory = inputHistory.slice(-MAX_HISTORY);
+      }
+      
+      saveHistoryToStorage();
+      historyIndex = -1;
+    }
+
+    function navigateHistoryUp(atStart) {
+      if (inputHistory.length === 0) return;
+      
+      const input = $('#messageInput');
+      
+      // Save current draft if starting to browse
+      if (historyIndex === -1) {
+        currentDraft = input.val();
+      }
+      
+      // Move to older message
+      if (historyIndex < inputHistory.length - 1) {
+        historyIndex++;
+        const historyPos = inputHistory.length - 1 - historyIndex;
+        const textarea = input[0];
+        input.val(inputHistory[historyPos]);
+        // Place cursor at start or end based on where it was
+        if (atStart) {
+          textarea.selectionStart = textarea.selectionEnd = 0;
+        } else {
+          textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+        }
+      }
+    }
+
+    function navigateHistoryDown(atStart) {
+      if (historyIndex === -1) return;
+      
+      const input = $('#messageInput');
+      
+      // Move to newer message
+      historyIndex--;
+      
+      const textarea = input[0];
+      if (historyIndex === -1) {
+        // Restore draft
+        input.val(currentDraft);
+        // Place cursor at start or end based on where it was
+        if (atStart) {
+          textarea.selectionStart = textarea.selectionEnd = 0;
+        } else {
+          textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+        }
+      } else {
+        const historyPos = inputHistory.length - 1 - historyIndex;
+        input.val(inputHistory[historyPos]);
+        // Place cursor at start or end based on where it was
+        if (atStart) {
+          textarea.selectionStart = textarea.selectionEnd = 0;
+        } else {
+          textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+        }
+      }
+    }
+
+    // ========== MESSAGE QUEUE FUNCTIONS ==========
+
+    function queueMessage(text, images) {
+      messageQueue.push({
+        text: text,
+        images: images,
+        timestamp: Date.now()
+      });
+      renderPendingQueue();
+    }
+
+    function removeFromQueue(index) {
+      messageQueue.splice(index, 1);
+      renderPendingQueue();
+    }
+
+    function renderPendingQueue() {
+      const $container = $('#pendingQueue');
+      if (messageQueue.length === 0) {
+        $container.empty();
+        return;
+      }
+
+      // Track existing chips to detect new ones
+      const existingChips = $container.find('.pending-message-chip');
+      const wasEmpty = existingChips.length === 0;
+
+      $container.html(messageQueue.map((msg, index) => {
+        const preview = msg.text.substring(0, 50) + (msg.text.length > 50 ? '...' : '');
+        const position = `${index + 1} of ${messageQueue.length}`;
+        return `
+          <div class="pending-message-chip${wasEmpty && index === messageQueue.length - 1 ? ' entering' : ''}">
+            <span class="pending-message-preview" title="${escapeHtml(msg.text)}">${escapeHtml(preview)}</span>
+            <span class="pending-message-position">${position}</span>
+            <button class="pending-message-remove" onclick="removeFromQueue(${index})" title="Remove">×</button>
+          </div>
+        `;
+      }).join(''));
+
+      // Remove 'entering' class after animation completes
+      if (wasEmpty && messageQueue.length > 0) {
+        setTimeout(() => {
+          $container.find('.pending-message-chip.entering').removeClass('entering');
+        }, 300);
+      }
+    }
+
+    function processNextInQueue() {
+      if (messageQueue.length === 0 || isSending) {
+        isProcessingQueue = false;
+        return;
+      }
+
+      isProcessingQueue = true;
+
+      // Add exiting animation to the first chip (FIFO)
+      const $firstChip = $('#pendingQueue .pending-message-chip:first-child');
+
+      if ($firstChip.length) {
+        $firstChip.addClass('exiting');
+
+        // Wait for animation to complete before removing from queue
+        setTimeout(() => {
+          const nextMessage = messageQueue.shift();
+          renderPendingQueue();
+
+          // Send the queued message
+          sendMessageInternal(nextMessage.text, nextMessage.images);
+        }, 300);
+      } else {
+        // No animation needed, process immediately
+        const nextMessage = messageQueue.shift();
+        renderPendingQueue();
+        sendMessageInternal(nextMessage.text, nextMessage.images);
+      }
+    }
+
+    // ========== MULTIMODAL FUNCTIONS ==========
+
+    function setupDragAndDrop() {
+      const $dropZone = $('#dropZone');
+      const $fileInput = $('#fileInput');
+
+      $dropZone.on('dragover', handleDragOver);
+      $dropZone.on('dragleave', handleDragLeave);
+      $dropZone.on('drop', handleDrop);
+      $dropZone.on('click', () => $fileInput.click());
+      $fileInput.on('change', handleFileSelect);
+    }
+
+    // ========== RESIZE INPUT FUNCTIONS ==========
+
+    function setupResizeHandle() {
+      const $handle = $('#resizeHandle');
+      const $container = $('#inputContainer');
+      
+      // Restore saved height or use default
+      const savedHeight = getInputContainerHeight();
+      $container.css('height', savedHeight + 'px');
+      
+      let isResizing = false;
+      let startY = 0;
+      let startHeight = 0;
+      
+      // Handle window resize - constrain input container to new max if needed
+      $(window).on('resize', function() {
+        const currentHeight = $container.height();
+        const maxHeight = window.innerHeight * 0.9;
+        if (currentHeight > maxHeight) {
+          $container.css('height', maxHeight + 'px');
+          saveInputContainerHeight(maxHeight);
+        }
+      });
+      
+      $handle.on('mousedown', function(e) {
+        e.preventDefault();
+        isResizing = true;
+        startY = e.clientY;
+        startHeight = $container.height();
+        
+        $handle.addClass('dragging');
+        $('body').css('user-select', 'none');
+        
+        $(document).on('mousemove', handleMouseMove);
+        $(document).on('mouseup', handleMouseUp);
+      });
+      
+      function handleMouseMove(e) {
+        if (!isResizing) return;
+        
+        // Calculate new height (inverse: drag up = increase, drag down = decrease)
+        const deltaY = e.clientY - startY;
+        let newHeight = startHeight - deltaY;
+        
+        // Apply constraints
+        const minHeight = 60;
+        const maxHeight = window.innerHeight * 0.9;
+        newHeight = Math.max(minHeight, Math.min(maxHeight, newHeight));
+        
+        $container.css('height', newHeight + 'px');
+      }
+      
+      function handleMouseUp() {
+        if (!isResizing) return;
+        
+        isResizing = false;
+        $handle.removeClass('dragging');
+        $('body').css('user-select', '');
+        
+        // Save height to localStorage
+        const finalHeight = $container.height();
+        saveInputContainerHeight(finalHeight);
+        
+        $(document).off('mousemove', handleMouseMove);
+        $(document).off('mouseup', handleMouseUp);
+      }
+    }
+    
+    function saveInputContainerHeight(height) {
+      try {
+        localStorage.setItem('claude-chat-input-height', height.toString());
+      } catch (error) {
+        console.error('Error saving input height:', error);
+      }
+    }
+    
+    function getInputContainerHeight() {
+      try {
+        const saved = localStorage.getItem('claude-chat-input-height');
+        if (saved) {
+          const height = parseInt(saved, 10);
+          const maxHeight = window.innerHeight * 0.9;
+          if (!isNaN(height) && height >= 60 && height <= maxHeight) {
+            return height;
+          }
+        }
+      } catch (error) {
+        console.error('Error loading input height:', error);
+      }
+      return 70; // Default height
+    }
+
+    function handleDragOver(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      $('#dropZone').addClass('drag-over');
+    }
+
+    function handleDragLeave(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      $('#dropZone').removeClass('drag-over');
+    }
+
+    function handleDrop(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      $('#dropZone').removeClass('drag-over');
+      
+      const files = Array.from(event.originalEvent.dataTransfer.files);
+      processFiles(files);
+    }
+
+    function handleFileSelect(event) {
+      const files = Array.from(event.target.files);
+      processFiles(files);
+      event.target.value = ''; // Reset input
+    }
+
+    function processFiles(files) {
+      files.forEach(file => {
+        if (!validateImageFile(file)) return;
+        processImageFile(file);
+      });
+    }
+
+    function validateImageFile(file) {
+      const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+      const maxSize = 30 * 1024 * 1024; // 30MB
+
+      if (!validTypes.includes(file.type)) {
+        updateStatus('error', `Invalid file type: ${file.type}. Use JPEG, PNG, GIF, or WebP.`);
+        setTimeout(() => updateStatus('', ''), 3000);
+        return false;
+      }
+
+      if (file.size > maxSize) {
+        updateStatus('error', `File too large: ${(file.size / 1024 / 1024).toFixed(1)}MB. Max 30MB.`);
+        setTimeout(() => updateStatus('', ''), 3000);
+        return false;
+      }
+
+      return true;
+    }
+
+    function processImageFile(file) {
+      const reader = new FileReader();
+      
+      reader.onload = function(e) {
+        const base64Data = e.target.result;
+        addAttachment({
+          file: file,
+          base64Data: base64Data,
+          mediaType: file.type,
+          preview: base64Data
+        });
+      };
+      
+      reader.readAsDataURL(file);
+    }
+
+    function addAttachment(fileData) {
+      attachedFiles.push(fileData);
+      renderAttachmentPreview();
+    }
+
+    function removeAttachment(index) {
+      attachedFiles.splice(index, 1);
+      renderAttachmentPreview();
+    }
+
+    function renderAttachmentPreview() {
+      const $container = $('#attachmentPreview');
+      if (attachedFiles.length === 0) {
+        $container.empty();
+        return;
+      }
+
+      $container.html(attachedFiles.map((file, index) => `
+        <div class="attachment-thumbnail">
+          <img src="${file.preview}" alt="${file.file.name}">
+          <button class="attachment-remove-btn" onclick="removeAttachment(${index})" title="Remove">×</button>
+        </div>
+      `).join(''));
+    }
+
+    // ========== CORE CHAT FUNCTIONS ==========
+
+    function switchTab(tab) {
+      currentTab = tab;
+      $('.tab').removeClass('active');
+      $('.tab-content').removeClass('active');
+
+      if (tab === 'chat') {
+        $('.tab:first-child').addClass('active');
+        $('#chatTab').addClass('active');
+      } else {
+        $('.tab:last-child').addClass('active');
+        $('#configTab').addClass('active');
+      }
+    }
+
+    function loadConfig() {
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success && result.config) {
+            $('#apiKey').val(result.config.apiKey || '');
+          }
+        })
+        .withFailureHandler(function() {})
+        .exec_api(null, 'sheets-chat/UISupport', 'getConfig');
+    }
+
+    function saveConfig() {
+      const apiKey = $('#apiKey').val().trim();
+      if (!apiKey) {
+        updateConfigStatus('error', 'API key is required');
+        return;
+      }
+
+      updateConfigStatus('sending', 'Saving...');
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            updateConfigStatus('success', 'Configuration saved!');
+            setTimeout(() => updateConfigStatus('', ''), 3000);
+          } else {
+            updateConfigStatus('error', result.error || 'Failed to save');
+          }
+        })
+        .withFailureHandler(function(error) {
+          updateConfigStatus('error', 'Error: ' + error);
+        })
+        .exec_api(null, 'sheets-chat/UISupport', 'saveConfig', {apiKey: apiKey});
+    }
+
+    function updateConfigStatus(type, text) {
+      const $status = $('#configStatus');
+      $status.attr('class', `status ${type}`);
+      $status.html(type === 'sending'
+        ? '<span class="spinner"></span>' + text
+        : text);
+    }
+
+    // ========== CURSOR POSITION HELPERS ==========
+
+    function isAtLineStart(textarea) {
+      const pos = textarea.selectionStart;
+      if (pos === 0) return true; // Start of text
+      const text = textarea.value;
+      return text[pos - 1] === '\n'; // Right after newline
+    }
+
+    function isAtLineEnd(textarea) {
+      const pos = textarea.selectionStart;
+      const text = textarea.value;
+      if (pos === text.length) return true; // End of text
+      return text[pos] === '\n'; // Right before newline
+    }
+
+    function handleKeyDown(event) {
+      // Up arrow: Navigate history only if at line start or end
+      if (event.key === 'ArrowUp' && !event.shiftKey) {
+        const textarea = document.getElementById('messageInput');
+        const atStart = isAtLineStart(textarea);
+        const atEnd = isAtLineEnd(textarea);
+        if (atStart || atEnd) {
+          event.preventDefault();
+          navigateHistoryUp(atStart);
+        }
+        return;
+      }
+
+      // Down arrow: Navigate history only if at line start or end
+      if (event.key === 'ArrowDown' && !event.shiftKey) {
+        const textarea = document.getElementById('messageInput');
+        const atStart = isAtLineStart(textarea);
+        const atEnd = isAtLineEnd(textarea);
+        if (atStart || atEnd) {
+          event.preventDefault();
+          navigateHistoryDown(atStart);
+        }
+        return;
+      }
+
+      // Enter: Send message
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        historyIndex = -1; // Reset history browsing
+        sendMessage();
+        return;
+      }
+
+      // Any other key: Exit history browsing
+      if (historyIndex !== -1 && event.key.length === 1) {
+        historyIndex = -1;
+      }
+    }
+
+    function runAgainMessage(button) {
+      const $btn = $(button);
+      const $message = $btn.closest('.message');
+      const text = $message.data('messageText') || '';
+      const images = $message.data('messageImages') || [];
+
+      // Visual feedback animation
+      $btn.addClass('clicked');
+      setTimeout(() => $btn.removeClass('clicked'), 300);
+
+      // If currently sending, add to queue
+      if (isSending) {
+        queueMessage(text, images);
+        updateStatus('', 'Added to queue');
+        setTimeout(() => {
+          if (!isSending) updateStatus('', '');
+        }, 2000);
+      } else {
+        // Send immediately
+        sendMessageInternal(text, images);
+      }
+    }
+
+    function sendMessage() {
+      const $input = $('#messageInput');
+      const text = $input.val().trim();
+      
+      if (!text && attachedFiles.length === 0) return;
+
+      // Prepare images
+      const images = attachedFiles.map(file => ({
+        data: file.base64Data.split(',')[1],
+        mediaType: file.mediaType
+      }));
+
+      // If already sending, queue this message
+      if (isSending) {
+        queueMessage(text, images);
+        $input.val('');
+        attachedFiles = [];
+        renderAttachmentPreview();
+        return;
+      }
+
+      // Send immediately
+      sendMessageInternal(text, images);
+      
+      // Add to history
+      if (text) {
+        addToHistory(text);
+      }
+      
+      $input.val('');
+      attachedFiles = [];
+      renderAttachmentPreview();
+    }
+
+    function sendInitialGreeting() {
+      // Call server to get personalized greeting
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success && result.greeting) {
+            // Generate request ID for this initial message
+            const requestId = 'initial-' + Date.now();
+            
+            // Add as assistant message (no user message needed)
+            addMessage('assistant', result.greeting, requestId, null, false);
+          } else {
+            // Fallback to showing welcome screen if greeting fails
+            showWelcomeScreen();
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error loading initial greeting:', error);
+          // Fallback to showing welcome screen on error
+          showWelcomeScreen();
+        })
+        .exec_api(null, 'sheets-chat/UISupport', 'getInitialGreeting');
+    }
+
+    function sendMessageInternal(text, images) {
+      // Generate unique request ID
+      const requestId = Date.now() + '-' + Math.random().toString(36).substring(2);
+      currentRequestId = requestId;
+      
+      // Reset polling interval for new message
+      pollInterval = 300;
+      consecutiveErrors = 0;
+      
+      isSending = true;
+      requestStartTime = Date.now();
+      stopRelativeTimeTimer(); // Stop previous relative time updates
+      startSendingTimer();
+      $('#sendBtn').prop('disabled', true);
+      
+      // Add user message to UI with requestId
+      addMessage('user', text, requestId, images);
+      
+      // Create thinking bubble immediately
+      const $userMsg = $(`.message.user[data-request-id="${requestId}"]`);
+      const thinkingEl = createThinkingBubble(requestId);
+      $userMsg.after(thinkingEl);
+      thinkingBubbles.set(requestId, thinkingEl);
+      
+      startThinkingPoll();
+
+      // Scroll to top of thinking bubble when it first appears
+      setTimeout(() => {
+        thinkingEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+
+      google.script.run
+        .withSuccessHandler(handleResponse)
+        .withFailureHandler(handleError)
+        .exec_api(null, 'sheets-chat/UISupport', 'sendMessageToClaude', {messages: conversationMessages, text: text, images: images, enableThinking: true, requestId: requestId});
+    }
+
+    function startThinkingPoll() {
+      pollThinkingOnce();
+    }
+
+    function pollThinkingOnce() {
+      google.script.run
+        .withSuccessHandler(function(result) {
+          // Reset backoff on success
+          pollInterval = 300;
+          consecutiveErrors = 0;
+          
+          handleThinkingMessages(result);
+          
+          // Chain next poll if still sending
+          if (isSending) {
+            setTimeout(pollThinkingOnce, pollInterval);
+          }
+        })
+        .withFailureHandler(function(error) {
+          // Implement exponential backoff on error
+          consecutiveErrors++;
+          pollInterval = Math.min(pollInterval * 2, MAX_POLL_INTERVAL);
+          
+          console.warn('[THINKING] Poll error, backing off to', pollInterval, 'ms. Error:', error);
+          
+          // Continue polling if still sending, but with backoff
+          if (isSending) {
+            setTimeout(pollThinkingOnce, pollInterval);
+          }
+        })
+        .exec_api(null, 'sheets-chat/UISupport', 'pollThinkingMessages', currentRequestId);
+    }
+
+    function stopThinkingPoll() {
+      // Polling automatically stops when isSending becomes false
+      // This function remains for compatibility but is no longer strictly needed
+      // as the chain will stop naturally when handleResponse sets isSending = false
+    }
+
+function createThinkingBubble(requestId) {
+  const $bubble = $('<div>')
+    .addClass('thinking-bubble thinking-bubble-loading collapsed')
+    .attr('data-request-id', requestId)
+    .html(`
+      <div class="thinking-bubble-header" onclick="toggleThinkingBubble('${requestId}')">
+        <span class="thinking-title">🧠 Claude's thinking</span>
+        <span class="thinking-chevron">►</span>
+      </div>
+      <div class="thinking-bubble-preview">
+        <div class="thinking-preview-text"></div>
+      </div>
+      <div class="thinking-content">
+        <div class="thinking-text"></div>
+      </div>
+    `);
+
+  // Initialize state tracking - start collapsed
+  thinkingBubbleStates.set(requestId, 'collapsed');
+  thinkingBubbleUserInteracted.set(requestId, false);
+
+  return $bubble[0];
+}
+
+function toggleThinkingBubble(requestId) {
+  const bubble = thinkingBubbles.get(requestId);
+  if (!bubble) return;
+
+  const $bubble = $(bubble);
+  const currentState = thinkingBubbleStates.get(requestId);
+
+  // Mark that user has interacted
+  thinkingBubbleUserInteracted.set(requestId, true);
+
+  // Cycle: collapsed → last-message → full → collapsed
+  if (currentState === 'collapsed') {
+    // Expand to last-message (show preview box)
+    $bubble.removeClass('collapsed full').addClass('last-message');
+    thinkingBubbleStates.set(requestId, 'last-message');
+  } else if (currentState === 'last-message') {
+    // Expand to full (keep preview, add full content below)
+    $bubble.removeClass('collapsed last-message').addClass('full');
+    thinkingBubbleStates.set(requestId, 'full');
+
+    // Scroll to bottom when expanding to full
+    setTimeout(() => {
+      const $content = $bubble.find('.thinking-content');
+      $content.scrollTop($content[0].scrollHeight);
+    }, 50);
+  } else {
+    // Collapse back to just header
+    $bubble.removeClass('full last-message').addClass('collapsed');
+    thinkingBubbleStates.set(requestId, 'collapsed');
+  }
+}
+
+function handleThinkingMessages(result) {
+      console.log('[THINKING] Poll result:', result);
+      if (result.success && result.messages?.length > 0) {
+        console.log('[THINKING] Received', result.messages.length, 'thinking messages');
+        result.messages.forEach(msg => {
+          console.log('[THINKING] Message:', {
+            requestId: msg.requestId,
+            textLength: msg.text?.length || 0,
+            textPreview: msg.text?.substring(0, 100) || '(empty)'
+          });
+          const requestId = msg.requestId ?? null;
+          if (!requestId) {
+            console.warn('Thinking message missing requestId, skipping:', msg);
+            return;
+          }
+
+          // Append to thinking bubble
+          appendThinkingText(requestId, msg.text);
+        });
+
+        // Scroll to top of the active thinking bubble instead of bottom
+        const thinkingEl = thinkingBubbles.get(currentRequestId);
+        if (thinkingEl) {
+          setTimeout(() => {
+            thinkingEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 50);
+        }
+      }
+    }
+
+    function appendThinkingText(requestId, text) {
+      if (!text?.trim()) return;
+
+      const bubble = thinkingBubbles.get(requestId);
+      if (!bubble) {
+        console.warn('[THINKING] No bubble found for requestId:', requestId);
+        return;
+      }
+
+      // Check if this bubble is finalized - if so, don't add new thinking
+      if (thinkingBubbleFinalized.get(requestId)) {
+        console.log('[THINKING] Bubble finalized, ignoring new thinking for requestId:', requestId);
+        return;
+      }
+
+      const $bubble = $(bubble);
+      const $previewText = $bubble.find('.thinking-preview-text');
+      const $fullText = $bubble.find('.thinking-text');
+      const state = thinkingBubbleStates.get(requestId);
+
+      // Always update preview box with latest message
+      $previewText.empty().append(document.createTextNode(text.trim()));
+
+      // Always append to full content for history
+      const $content = $bubble.find('.thinking-content');
+      const wasAtBottom = isScrolledToBottom($content[0]);
+      $fullText.append(document.createTextNode(text.trim() + '\n\n'));
+
+      // Auto-scroll if in full mode and was at bottom
+      if (state === 'full' && wasAtBottom) {
+        $content.scrollTop($content[0].scrollHeight);
+      }
+
+      // Auto-expand from collapsed to last-message on first message
+      if (state === 'collapsed' && !thinkingBubbleUserInteracted.get(requestId)) {
+        $bubble.removeClass('collapsed').addClass('last-message');
+        thinkingBubbleStates.set(requestId, 'last-message');
+      }
+
+      // Stop loading animation when content appears
+      $bubble.removeClass('thinking-bubble-loading');
+    }
+
+    function isScrolledToBottom(element) {
+      if (!element) return true;
+      return element.scrollHeight - element.clientHeight <= element.scrollTop + 1;
+    }
+
+    // ========== ERROR BUBBLE FUNCTIONS ==========
+
+    function createErrorBubble(requestId, errorData) {
+      const $bubble = $('<div>')
+        .addClass('error-bubble collapsed')
+        .attr('data-request-id', requestId)
+        .html(`
+          <div class="error-bubble-header" onclick="toggleErrorBubble('${requestId}')">
+            <span class="error-title">⚠️ Error</span>
+            <span class="error-chevron">►</span>
+          </div>
+          <div class="error-bubble-content">
+            <div class="error-text"></div>
+          </div>
+        `);
+
+      // Initialize state tracking - start collapsed
+      errorBubbleStates.set(requestId, 'collapsed');
+
+      // Populate error content
+      const $errorText = $bubble.find('.error-text');
+      let errorContent = '';
+
+      if (errorData.message) {
+        errorContent += 'Message: ' + errorData.message + '\n\n';
+      }
+      if (errorData.code) {
+        errorContent += 'Code: ' + errorData.code + '\n\n';
+      }
+      if (errorData.stack) {
+        errorContent += 'Stack:\n' + errorData.stack;
+      }
+
+      $errorText.text(errorContent || 'An unknown error occurred');
+
+      return $bubble[0];
+    }
+
+    function toggleErrorBubble(requestId) {
+      const bubble = errorBubbles.get(requestId);
+      if (!bubble) return;
+
+      const $bubble = $(bubble);
+      const currentState = errorBubbleStates.get(requestId);
+
+      // Toggle: collapsed ↔ expanded
+      if (currentState === 'collapsed') {
+        $bubble.removeClass('collapsed').addClass('expanded');
+        errorBubbleStates.set(requestId, 'expanded');
+      } else {
+        $bubble.removeClass('expanded').addClass('collapsed');
+        errorBubbleStates.set(requestId, 'collapsed');
+      }
+    }
+
+    function handleResponse(result) {
+      // Log what we received (for diagnosis)
+      console.log('[CLIENT] Received response:', {
+        type: typeof result,
+        isNull: result === null,
+        isUndefined: result === undefined,
+        hasSuccess: result?.success !== undefined,
+        value: result
+      });
+      
+      stopThinkingPoll();
+      isSending = false;
+      $('#sendBtn').prop('disabled', false);
+      updateStatus('', '');
+
+      // Defensive check for null/undefined response
+      if (!result) {
+        handleError('No response from server');
+        return;
+      }
+
+      if (result.success) {
+        const data = result.data;
+
+        // Stop thinking animation for this request and auto-collapse
+        if (currentRequestId) {
+          const thinkingEl = thinkingBubbles.get(currentRequestId);
+          if (thinkingEl) {
+            const $bubble = $(thinkingEl);
+            $bubble.removeClass('thinking-bubble-loading');
+
+            // Auto-collapse to collapsed state (regardless of user interaction)
+            $bubble.removeClass('last-message full').addClass('collapsed');
+            thinkingBubbleStates.set(currentRequestId, 'collapsed');
+            
+            // Mark as finalized - won't respond to new thinking messages
+            thinkingBubbleFinalized.set(currentRequestId, true);
+          }
+        }
+
+        // Append new assistant message to client's conversation array
+        if (data.message) {
+          conversationMessages.push(data.message);
+        }
+        addMessage('assistant', data.response, currentRequestId);
+        
+        // Scroll to top of assistant message/results
+        setTimeout(() => {
+          const $assistantMsg = $(`.message.assistant[data-request-id="${currentRequestId}"]`);
+          if ($assistantMsg.length) {
+            $assistantMsg[0].scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 100);
+        
+        // Remove responding animation after delay and cleanup
+        const timeoutId = setTimeout(() => {
+          $(`.message.assistant[data-request-id="${currentRequestId}"]`).removeClass('responding');
+          respondingTimeouts.delete(currentRequestId);
+        }, RESPONDING_ANIMATION_DURATION);
+        respondingTimeouts.set(currentRequestId, timeoutId);
+        
+        // Update status with duration, tokens, and relative time
+        stopSendingTimer();
+        requestEndTime = Date.now();
+        
+        if (data.usage) {
+          const duration = Math.round((requestEndTime - requestStartTime) / 1000); // Round to whole seconds
+          lastTokenCount = data.usage.input_tokens + data.usage.output_tokens;
+          const tokens = formatTokens(lastTokenCount);
+          const relTime = formatRelativeTime(requestEndTime);
+          const newText = `${duration}s | ${tokens} | ${relTime}`;
+          
+          lastStatusText = newText; // Store initial text
+          updateStatus('', newText);
+          
+          // Start live relative time updates
+          startRelativeTimeTimer();
+        }
+
+        // Process next message in queue
+        if (messageQueue.length > 0) {
+          setTimeout(() => processNextInQueue(), 500);
+        }
+      } else {
+        handleError(result.error || 'Unknown error');
+      }
+    }
+
+    function handleError(error) {
+      // DETAILED ERROR LOGGING - shows exactly what error client received
+      console.error('[CLIENT] Error received:', {
+        type: typeof error,
+        isString: typeof error === 'string',
+        isObject: typeof error === 'object',
+        isNull: error === null,
+        isUndefined: error === undefined,
+        errorValue: error,
+        errorMessage: error?.message || error,
+        errorStack: error?.stack,
+        errorKeys: typeof error === 'object' && error !== null ? Object.keys(error) : [],
+        errorConstructor: error?.constructor?.name,
+        stringified: JSON.stringify(error, null, 2)
+      });
+      
+      stopThinkingPoll();
+      stopSendingTimer();
+      stopRelativeTimeTimer();
+      isSending = false;
+      $('#sendBtn').prop('disabled', false);
+      updateStatus('error', 'Error: ' + error);
+
+      // Remove responding animation and cleanup timeouts
+      if (currentRequestId) {
+        // Clear timeout for current request
+        const timeoutId = respondingTimeouts.get(currentRequestId);
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          respondingTimeouts.delete(currentRequestId);
+        }
+        
+        // Remove responding class from current message
+        $(`.message.assistant[data-request-id="${currentRequestId}"]`).removeClass('responding');
+      }
+
+      // Collapse and finalize thinking bubble if it exists
+      if (currentRequestId) {
+        const thinkingEl = thinkingBubbles.get(currentRequestId);
+        if (thinkingEl) {
+          const $bubble = $(thinkingEl);
+          $bubble.removeClass('thinking-bubble-loading last-message full').addClass('collapsed');
+          thinkingBubbleStates.set(currentRequestId, 'collapsed');
+          thinkingBubbleFinalized.set(currentRequestId, true);
+        }
+
+        // Create and display error bubble
+        const errorData = {
+          message: typeof error === 'string' ? error : error?.message || 'Unknown error',
+          code: error?.code || null,
+          stack: error?.stack || null
+        };
+
+        const errorEl = createErrorBubble(currentRequestId, errorData);
+        errorBubbles.set(currentRequestId, errorEl);
+
+        // Insert error bubble after thinking bubble (or after user message if no thinking bubble)
+        if (thinkingEl) {
+          $(thinkingEl).after(errorEl);
+        } else {
+          const $userMsg = $(`.message.user[data-request-id="${currentRequestId}"]`);
+          if ($userMsg.length) {
+            $userMsg.after(errorEl);
+          } else {
+            $('#chatContainer').append(errorEl);
+          }
+        }
+
+        // Scroll to show error bubble smoothly
+        setTimeout(() => {
+          errorEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100); // Small delay to ensure DOM is updated
+      }
+
+      // Process next message in queue after error (with longer delay to prevent rapid error loops)
+      if (messageQueue.length > 0) {
+        setTimeout(() => processNextInQueue(), 2000); // 2s delay vs 500ms on success
+      } else {
+        isProcessingQueue = false;
+      }
+    }
+
+    function addMessage(role, content, requestId, images, addAnimation = true) {
+      // Hide drop zone after first user message
+      if (role === 'user' && conversationMessages.length === 0) {
+        $('#dropZone').addClass('hidden');
+      }
+      
+      // Remove responding class from previous assistant messages and cleanup timeouts
+      if (role === 'assistant' && addAnimation) {
+        // Clear all pending animation timeouts
+        respondingTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+        respondingTimeouts.clear();
+        
+        // Remove responding class from all previous messages
+        $('.message.assistant.responding').removeClass('responding');
+      }
+      
+      const $message = $('<div>')
+        .addClass(`message ${role}`)
+        .attr('data-request-id', requestId);
+      
+      // Add responding class to new assistant message (will be removed after delay)
+      if (role === 'assistant' && addAnimation) {
+        $message.addClass('responding');
+      }
+
+      // Store message data for run-again functionality using jQuery .data()
+      if (role === 'user') {
+        $message.data('messageText', content || '');
+        if (images && images.length > 0) {
+          $message.data('messageImages', images);
+        }
+      }
+
+      let imageHtml = '';
+      if (images && images.length > 0) {
+        imageHtml = '<div class="message-images">' +
+          images.map(img => `<img class="message-image-thumb" src="data:${img.mediaType};base64,${img.data}" alt="attachment">`).join('') +
+          '</div>';
+      }
+
+      // Add run-again button for user messages
+      const runAgainBtn = role === 'user'
+        ? '<button class="message-run-again-btn" title="Run again">🔄</button>'
+        : '';
+
+      $message.html(`
+        ${runAgainBtn}
+        <div class="message-label">${role === 'user' ? 'You' : 'Claude'}</div>
+        ${imageHtml}
+        <div class="message-content">${escapeHtml(content)}</div>
+      `);
+      
+      const $container = $('#chatContainer');
+      $container.append($message);
+      $container.scrollTop($container[0].scrollHeight);
+    }
+
+    function updateStatus(type, text) {
+      const $status = $('#status');
+      $status.attr('class', `status ${type}`);
+      $status.html(type === 'sending'
+        ? '<span class="spinner"></span>' + text
+        : text);
+    }
+
+    function showWelcomeScreen() {
+      $('#chatContainer').html(`
+        <div class="welcome-screen">
+          <h2 class="welcome-title">Hello! How can I help you today?</h2>
+          <p class="welcome-subtitle">Ask me anything or try one of these suggestions:</p>
+          <div class="welcome-prompts">
+            <button class="prompt-chip" onclick="quickPrompt('Explain how async/await works in JavaScript')">
+              💡 Explain a concept
+            </button>
+            <button class="prompt-chip" onclick="quickPrompt('Help me debug this error')">
+              🐛 Debug code
+            </button>
+            <button class="prompt-chip" onclick="quickPrompt('Analyze this spreadsheet data')">
+              📊 Analyze data
+            </button>
+            <button class="prompt-chip" onclick="quickPrompt('Write a function to calculate...')">
+              ⚙️ Generate code
+            </button>
+          </div>
+        </div>
+      `);
+    }
+
+    function quickPrompt(prompt) {
+      $('#messageInput').val(prompt).focus();
+    }
+
+    function saveThread() {
+      if (conversationMessages.length === 0) {
+        updateStatus('error', 'No conversation to save');
+        setTimeout(() => updateStatus('', ''), 2000);
+        return;
+      }
+      updateStatus('sending', 'Saving...');
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            // Update current conversation ID
+            currentConversationId = result.id;
+            
+            // Show success with title
+            const shortTitle = result.title.length > 50 ? result.title.substring(0, 50) + '...' : result.title;
+            updateStatus('success', 'Saved: ' + shortTitle);
+            setTimeout(() => updateStatus('', ''), 3000);
+            
+            // Refresh dropdown to show new conversation
+            loadConversationsList();
+          } else {
+            updateStatus('error', result.error || 'Failed to save');
+            setTimeout(() => updateStatus('', ''), 3000);
+          }
+        })
+        .withFailureHandler(function(error) {
+          updateStatus('error', 'Error: ' + error);
+          setTimeout(() => updateStatus('', ''), 3000);
+        })
+        .exec_api(null, 'sheets-chat/UISupport', 'saveThread', {messages: conversationMessages, nextSequenceId: 1});
+    }
+
+    function loadThread() {
+      // Get selected conversation ID from dropdown
+      const selectedId = $('#conversationSelector').val();
+      
+      if (!selectedId) {
+        updateStatus('error', 'Please select a conversation from dropdown');
+        setTimeout(() => updateStatus('', ''), 2000);
+        return;
+      }
+      
+      updateStatus('sending', 'Loading...');
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success && result.thread && result.thread.messages) {
+            conversationMessages = result.thread.messages;
+            currentConversationId = selectedId;
+            renderThread();
+            
+            // Get selected option text for status message
+            const selectedText = $('#conversationSelector option:selected').text();
+            const shortText = selectedText.length > 50 ? selectedText.substring(0, 50) + '...' : selectedText;
+            updateStatus('success', 'Loaded: ' + shortText);
+            setTimeout(() => updateStatus('', ''), 3000);
+          } else {
+            updateStatus('error', 'Conversation not found');
+            setTimeout(() => updateStatus('', ''), 2000);
+          }
+        })
+        .withFailureHandler(function(error) {
+          updateStatus('error', 'Error: ' + error);
+          setTimeout(() => updateStatus('', ''), 3000);
+        })
+        .exec_api(null, 'sheets-chat/UISupport', 'loadThread', selectedId);
+    }
+
+    function renderThread() {
+      const $container = $('#chatContainer');
+      $container.empty();
+      thinkingBubbles.clear();
+      thinkingBubbleStates.clear();
+      thinkingBubbleUserInteracted.clear();
+      
+      // Clear all pending animation timeouts
+      respondingTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+      respondingTimeouts.clear();
+      
+      currentRequestId = null;
+      conversationMessages.forEach(msg => {
+        addMessage(msg.role, msg.content, null, null, false);
+      });
+    }
+
+    function clearChat() {
+      conversationMessages = [];
+      thinkingBubbles.clear();
+      thinkingBubbleStates.clear();
+      thinkingBubbleUserInteracted.clear();
+      thinkingBubbleFinalized.clear();
+      errorBubbles.clear();
+      errorBubbleStates.clear();
+      
+      // Clear all pending animation timeouts
+      respondingTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+      respondingTimeouts.clear();
+      
+      // Cleanup timers and timing state
+      stopSendingTimer();
+      stopRelativeTimeTimer();
+      requestStartTime = null;
+      requestEndTime = null;
+      lastTokenCount = 0;
+      lastStatusText = '';
+      
+      currentRequestId = null;
+      messageQueue = [];
+      attachedFiles = [];
+      updateStatus('', '');
+      renderPendingQueue();
+      renderAttachmentPreview();
+      
+      // Show drop zone again
+      $('#dropZone').removeClass('hidden');
+      
+      sendInitialGreeting(); // Auto-send personalized greeting
+      google.script.run
+        .withSuccessHandler(() => {})
+        .withFailureHandler(() => {})
+        .exec_api(null, 'sheets-chat/UISupport', 'clearChat');
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+  </script>
+</body>
+</html>

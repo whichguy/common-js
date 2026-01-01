@@ -1,0 +1,1439 @@
+function _main(
+  module = globalThis.__getCurrentModule(),
+  exports = module.exports,
+  log = globalThis.__getModuleLogFunction?.(module) || (() => {})
+) {
+  const { describe, it, beforeEach } = require('test-framework/mocha-adapter');
+  const { expect, assert } = require('test-framework/chai-assertions');
+  const ThreadContinuation = require('sheets-chat/ThreadContinuation');
+
+  // ============================================================================
+  // TEST DATA FIXTURES
+  // ============================================================================
+
+  /**
+   * Generate mock messages for testing
+   * @param {number} count - Number of messages to generate
+   * @param {Object} options - Options for message generation
+   * @returns {Array} Array of mock messages
+   */
+  function generateMockMessages(count, options = {}) {
+    const messages = [];
+    const avgLength = options.avgLength || 200;
+
+    for (let i = 0; i < count; i++) {
+      const isUser = i % 2 === 0;
+      messages.push({
+        role: isUser ? 'user' : 'assistant',
+        content: 'x'.repeat(avgLength)
+      });
+    }
+
+    return messages;
+  }
+
+  /**
+   * Generate a mock message with content blocks
+   * @param {string} role - Message role
+   * @param {Array} blocks - Content blocks
+   * @returns {Object} Mock message
+   */
+  function generateBlockMessage(role, blocks) {
+    return { role, content: blocks };
+  }
+
+  // ============================================================================
+  // TOKEN ESTIMATION TESTS
+  // ============================================================================
+
+  describe('ThreadContinuation - Token Estimation', function() {
+
+    describe('estimateTokens()', function() {
+
+      it('should return 0 for empty inputs', function() {
+        const result = ThreadContinuation.estimateTokens('', [], []);
+        // With 20% margin, empty should still be very low
+        expect(result).to.be.lessThan(10);
+      });
+
+      it('should estimate system prompt tokens correctly', function() {
+        const systemPrompt = 'x'.repeat(1000); // 1000 chars
+        const result = ThreadContinuation.estimateTokens(systemPrompt, [], []);
+
+        // ~1000 / 3.5 = ~286 tokens, with 20% margin = ~343
+        expect(result).to.be.greaterThan(200);
+        expect(result).to.be.lessThan(500);
+      });
+
+      it('should estimate tool tokens correctly', function() {
+        const tools = [
+          {
+            name: 'test_tool',
+            description: 'A test tool for testing',
+            input_schema: {
+              type: 'object',
+              properties: {
+                param1: { type: 'string' },
+                param2: { type: 'number' }
+              }
+            }
+          }
+        ];
+
+        const result = ThreadContinuation.estimateTokens('', [], tools);
+
+        // Tools JSON is ~200 chars, / 3 = ~67 tokens, with margin = ~80
+        expect(result).to.be.greaterThan(50);
+        expect(result).to.be.lessThan(200);
+      });
+
+      it('should estimate message tokens correctly', function() {
+        const messages = generateMockMessages(10, { avgLength: 400 });
+        const result = ThreadContinuation.estimateTokens('', messages, []);
+
+        // 10 messages * 400 chars = 4000 chars, / 4 = 1000 tokens, with margin = ~1200
+        expect(result).to.be.greaterThan(900);
+        expect(result).to.be.lessThan(1500);
+      });
+
+      it('should combine all inputs correctly', function() {
+        const systemPrompt = 'x'.repeat(1000);
+        const messages = generateMockMessages(5, { avgLength: 200 });
+        const tools = [{ name: 'tool', description: 'x'.repeat(100) }];
+
+        const result = ThreadContinuation.estimateTokens(systemPrompt, messages, tools);
+
+        // Should be sum of all components with margin
+        expect(result).to.be.greaterThan(400);
+      });
+
+      it('should include 20% safety margin', function() {
+        // Test with known input
+        const messages = [{ role: 'user', content: 'x'.repeat(400) }];
+
+        // 400 chars / 4 = 100 tokens
+        // With 20% margin = 120 tokens
+        const result = ThreadContinuation.estimateTokens('', messages, []);
+
+        expect(result).to.be.greaterThan(100);
+        expect(result).to.be.lessThan(150);
+      });
+    });
+
+    describe('estimateMessageTokens()', function() {
+
+      it('should return 0 for null or undefined message', function() {
+        expect(ThreadContinuation.estimateMessageTokens(null)).to.equal(0);
+        expect(ThreadContinuation.estimateMessageTokens(undefined)).to.equal(0);
+      });
+
+      it('should return 0 for message without content', function() {
+        expect(ThreadContinuation.estimateMessageTokens({ role: 'user' })).to.equal(0);
+        expect(ThreadContinuation.estimateMessageTokens({ role: 'user', content: null })).to.equal(0);
+      });
+
+      it('should estimate string content correctly', function() {
+        const msg = { role: 'user', content: 'x'.repeat(100) };
+        const result = ThreadContinuation.estimateMessageTokens(msg);
+
+        // 100 chars / 4 = 25 tokens
+        expect(result).to.equal(25);
+      });
+
+      it('should estimate text blocks correctly', function() {
+        const msg = generateBlockMessage('user', [
+          { type: 'text', text: 'x'.repeat(200) }
+        ]);
+        const result = ThreadContinuation.estimateMessageTokens(msg);
+
+        // 200 chars / 4 = 50 tokens
+        expect(result).to.equal(50);
+      });
+
+      it('should estimate image blocks as ~1500 tokens', function() {
+        const msg = generateBlockMessage('user', [
+          { type: 'image', source: { type: 'base64', data: 'xxx' } }
+        ]);
+        const result = ThreadContinuation.estimateMessageTokens(msg);
+
+        expect(result).to.equal(1500);
+      });
+
+      it('should estimate tool_use blocks correctly', function() {
+        const msg = generateBlockMessage('assistant', [
+          { type: 'tool_use', id: 'tool_123', name: 'test_tool', input: { x: 1 } }
+        ]);
+        const result = ThreadContinuation.estimateMessageTokens(msg);
+
+        // JSON length ~70 chars, / 3 = ~23 tokens
+        expect(result).to.be.greaterThan(15);
+        expect(result).to.be.lessThan(40);
+      });
+
+      it('should estimate tool_result blocks correctly', function() {
+        const msg = generateBlockMessage('user', [
+          { type: 'tool_result', tool_use_id: 'tool_123', content: 'Result: success' }
+        ]);
+        const result = ThreadContinuation.estimateMessageTokens(msg);
+
+        expect(result).to.be.greaterThan(10);
+      });
+
+      it('should skip thinking blocks', function() {
+        const msg = generateBlockMessage('assistant', [
+          { type: 'thinking', thinking: 'x'.repeat(1000) }
+        ]);
+        const result = ThreadContinuation.estimateMessageTokens(msg);
+
+        // Thinking blocks should not be counted
+        expect(result).to.equal(0);
+      });
+
+      it('should combine multiple block types', function() {
+        const msg = generateBlockMessage('assistant', [
+          { type: 'text', text: 'x'.repeat(100) },  // ~25 tokens
+          { type: 'tool_use', id: 't1', name: 'test', input: {} }  // ~20-30 tokens
+        ]);
+        const result = ThreadContinuation.estimateMessageTokens(msg);
+
+        expect(result).to.be.greaterThan(40);
+        expect(result).to.be.lessThan(80);
+      });
+    });
+  });
+
+  // ============================================================================
+  // DETECTION TESTS
+  // ============================================================================
+
+  describe('ThreadContinuation - Detection', function() {
+
+    describe('shouldContinue()', function() {
+
+      it('should return true when token count exceeds threshold', function() {
+        const result = ThreadContinuation.shouldContinue(150000, 50);
+        expect(result).to.be.true;
+      });
+
+      it('should return false when token count is below threshold', function() {
+        const result = ThreadContinuation.shouldContinue(100000, 50);
+        expect(result).to.be.false;
+      });
+
+      it('should return true when message count exceeds threshold', function() {
+        const result = ThreadContinuation.shouldContinue(50000, 100);
+        expect(result).to.be.true;
+      });
+
+      it('should return false when both counts are below threshold', function() {
+        const result = ThreadContinuation.shouldContinue(50000, 50);
+        expect(result).to.be.false;
+      });
+
+      it('should respect custom config for token threshold', function() {
+        const customConfig = { tokenThreshold: 1000, messageThreshold: 200 };
+
+        expect(ThreadContinuation.shouldContinue(1500, 10, customConfig)).to.be.true;
+        expect(ThreadContinuation.shouldContinue(500, 10, customConfig)).to.be.false;
+      });
+
+      it('should respect custom config for message threshold', function() {
+        const customConfig = { tokenThreshold: 200000, messageThreshold: 10 };
+
+        expect(ThreadContinuation.shouldContinue(1000, 15, customConfig)).to.be.true;
+        expect(ThreadContinuation.shouldContinue(1000, 5, customConfig)).to.be.false;
+      });
+
+      it('should use default config thresholds', function() {
+        // Default tokenThreshold is 140000, messageThreshold is 80
+        expect(ThreadContinuation.shouldContinue(140001, 1)).to.be.true;
+        expect(ThreadContinuation.shouldContinue(1, 80)).to.be.true;
+        expect(ThreadContinuation.shouldContinue(139999, 79)).to.be.false;
+      });
+    });
+
+    describe('isContextExceededError()', function() {
+
+      it('should return false for null or undefined', function() {
+        expect(ThreadContinuation.isContextExceededError(null)).to.be.false;
+        expect(ThreadContinuation.isContextExceededError(undefined)).to.be.false;
+      });
+
+      it('should detect "context_length_exceeded" pattern', function() {
+        const error = new Error('API error: context_length_exceeded');
+        expect(ThreadContinuation.isContextExceededError(error)).to.be.true;
+      });
+
+      it('should detect "prompt is too long" pattern', function() {
+        const error = new Error('prompt is too long: 250000 tokens > 200000 maximum');
+        expect(ThreadContinuation.isContextExceededError(error)).to.be.true;
+      });
+
+      it('should detect "max_tokens" pattern', function() {
+        const error = new Error('exceeded max_tokens limit');
+        expect(ThreadContinuation.isContextExceededError(error)).to.be.true;
+      });
+
+      it('should detect "context window" pattern', function() {
+        const error = new Error('request exceeds context window');
+        expect(ThreadContinuation.isContextExceededError(error)).to.be.true;
+      });
+
+      it('should detect "token limit" pattern', function() {
+        const error = new Error('token limit exceeded');
+        expect(ThreadContinuation.isContextExceededError(error)).to.be.true;
+      });
+
+      it('should detect "exceeds the maximum" pattern', function() {
+        const error = new Error('your request exceeds the maximum allowed tokens');
+        expect(ThreadContinuation.isContextExceededError(error)).to.be.true;
+      });
+
+      it('should be case-insensitive', function() {
+        const error = new Error('CONTEXT_LENGTH_EXCEEDED');
+        expect(ThreadContinuation.isContextExceededError(error)).to.be.true;
+      });
+
+      it('should return false for unrelated errors', function() {
+        const errors = [
+          new Error('Network timeout'),
+          new Error('Invalid API key'),
+          new Error('Rate limited'),
+          new Error('Server error 500'),
+          new Error('Authentication failed')
+        ];
+
+        for (const error of errors) {
+          expect(ThreadContinuation.isContextExceededError(error)).to.be.false;
+        }
+      });
+
+      it('should handle error objects without message property', function() {
+        const error = { toString: () => 'context_length_exceeded' };
+        expect(ThreadContinuation.isContextExceededError(error)).to.be.true;
+      });
+    });
+
+    describe('getRecentTurns()', function() {
+
+      it('should return empty array for empty input', function() {
+        expect(ThreadContinuation.getRecentTurns([])).to.deep.equal([]);
+        expect(ThreadContinuation.getRecentTurns(null)).to.deep.equal([]);
+        expect(ThreadContinuation.getRecentTurns(undefined)).to.deep.equal([]);
+      });
+
+      it('should return all messages if fewer than requested turns', function() {
+        const messages = generateMockMessages(4);
+        const result = ThreadContinuation.getRecentTurns(messages, 5);
+
+        expect(result).to.have.length(4);
+      });
+
+      it('should return last N turn pairs', function() {
+        const messages = generateMockMessages(20);
+        const result = ThreadContinuation.getRecentTurns(messages, 5);
+
+        // 5 turns = up to 10 messages (5 user + 5 assistant)
+        expect(result.length).to.be.lessThan(12);
+
+        // Should contain the last messages
+        const lastMsg = result[result.length - 1];
+        expect(lastMsg.content).to.equal(messages[messages.length - 1].content);
+      });
+
+      it('should count user messages as turns', function() {
+        const messages = [
+          { role: 'user', content: 'msg1' },
+          { role: 'assistant', content: 'resp1' },
+          { role: 'user', content: 'msg2' },
+          { role: 'assistant', content: 'resp2' },
+          { role: 'user', content: 'msg3' },
+          { role: 'assistant', content: 'resp3' }
+        ];
+
+        const result = ThreadContinuation.getRecentTurns(messages, 2);
+
+        // Should get last 2 user messages and their responses (4 messages)
+        expect(result.length).to.equal(4);
+        expect(result[0].content).to.equal('msg2');
+      });
+
+      it('should handle conversations with multiple assistant messages per turn', function() {
+        const messages = [
+          { role: 'user', content: 'msg1' },
+          { role: 'assistant', content: 'resp1a' },
+          { role: 'assistant', content: 'resp1b' },  // Tool use continuation
+          { role: 'user', content: 'msg2' },
+          { role: 'assistant', content: 'resp2' }
+        ];
+
+        const result = ThreadContinuation.getRecentTurns(messages, 1);
+
+        // Should get messages back to the last user message
+        expect(result.length).to.equal(2);
+        expect(result[0].content).to.equal('msg2');
+        expect(result[1].content).to.equal('resp2');
+      });
+
+      it('should use default turn count of 5', function() {
+        const messages = generateMockMessages(100);
+        const result = ThreadContinuation.getRecentTurns(messages);
+
+        // Default is 5 turns = ~10 messages
+        expect(result.length).to.be.lessThan(12);
+      });
+    });
+
+    describe('generateThreadId()', function() {
+
+      it('should generate unique IDs', function() {
+        const ids = new Set();
+        for (let i = 0; i < 100; i++) {
+          ids.add(ThreadContinuation.generateThreadId());
+        }
+
+        expect(ids.size).to.equal(100);
+      });
+
+      it('should match expected format', function() {
+        const id = ThreadContinuation.generateThreadId();
+
+        expect(id).to.include('thread-');
+        expect(id.length).to.be.greaterThan(15);
+
+        // Should match format: thread-{timestamp}-{random}
+        const pattern = /^thread-\d+-[a-z0-9]+$/;
+        expect(pattern.test(id)).to.be.true;
+      });
+
+      it('should include timestamp', function() {
+        const before = Date.now();
+        const id = ThreadContinuation.generateThreadId();
+        const after = Date.now();
+
+        // Extract timestamp from ID
+        const timestampStr = id.split('-')[1];
+        const timestamp = parseInt(timestampStr, 10);
+
+        expect(timestamp).to.be.greaterThan(before - 1);
+        expect(timestamp).to.be.lessThan(after + 1);
+      });
+    });
+  });
+
+  // ============================================================================
+  // MEMORY HELPERS TESTS
+  // ============================================================================
+
+  describe('ThreadContinuation - Memory Helpers', function() {
+
+    describe('mergeMemory()', function() {
+
+      it('should merge entities from both sources', function() {
+        const existing = {
+          entities: { user: { name: 'Alice' } },
+          facts: ['fact1'],
+          currentGoal: 'goal1'
+        };
+
+        const extracted = {
+          entities: { project: { name: 'Test' } },
+          facts: ['fact2'],
+          currentGoal: 'goal2'
+        };
+
+        const result = ThreadContinuation.mergeMemory(existing, extracted);
+
+        expect(result.entities.user.name).to.equal('Alice');
+        expect(result.entities.project.name).to.equal('Test');
+      });
+
+      it('should combine facts from both sources', function() {
+        const existing = { entities: {}, facts: ['fact1', 'fact2'], currentGoal: null };
+        const extracted = { entities: {}, facts: ['fact3', 'fact4'], currentGoal: null };
+
+        const result = ThreadContinuation.mergeMemory(existing, extracted);
+
+        expect(result.facts).to.include('fact1');
+        expect(result.facts).to.include('fact4');
+      });
+
+      it('should deduplicate facts', function() {
+        const existing = { entities: {}, facts: ['fact1', 'fact2'], currentGoal: null };
+        const extracted = { entities: {}, facts: ['fact2', 'fact3'], currentGoal: null };
+
+        const result = ThreadContinuation.mergeMemory(existing, extracted);
+
+        // fact2 should only appear once
+        const fact2Count = result.facts.filter(f => f === 'fact2').length;
+        expect(fact2Count).to.equal(1);
+      });
+
+      it('should limit facts to 30', function() {
+        const existing = { entities: {}, facts: [], currentGoal: null };
+        const extracted = { entities: {}, facts: [], currentGoal: null };
+
+        // Add 40 unique facts
+        for (let i = 0; i < 20; i++) {
+          existing.facts.push(`existing-fact-${i}`);
+          extracted.facts.push(`extracted-fact-${i}`);
+        }
+
+        const result = ThreadContinuation.mergeMemory(existing, extracted);
+
+        expect(result.facts.length).to.equal(30);
+      });
+
+      it('should prefer extracted currentGoal over existing', function() {
+        const existing = { entities: {}, facts: [], currentGoal: 'old goal' };
+        const extracted = { entities: {}, facts: [], currentGoal: 'new goal' };
+
+        const result = ThreadContinuation.mergeMemory(existing, extracted);
+
+        expect(result.currentGoal).to.equal('new goal');
+      });
+
+      it('should keep existing currentGoal if extracted is null', function() {
+        const existing = { entities: {}, facts: [], currentGoal: 'old goal' };
+        const extracted = { entities: {}, facts: [], currentGoal: null };
+
+        const result = ThreadContinuation.mergeMemory(existing, extracted);
+
+        expect(result.currentGoal).to.equal('old goal');
+      });
+
+      it('should handle null existing memory', function() {
+        const extracted = {
+          entities: { key: 'value' },
+          facts: ['fact1'],
+          currentGoal: 'goal'
+        };
+
+        const result = ThreadContinuation.mergeMemory(null, extracted);
+
+        expect(result.entities.key).to.equal('value');
+        expect(result.facts).to.include('fact1');
+      });
+
+      it('should handle null extracted memory', function() {
+        const existing = {
+          entities: { key: 'value' },
+          facts: ['fact1'],
+          currentGoal: 'goal'
+        };
+
+        const result = ThreadContinuation.mergeMemory(existing, null);
+
+        expect(result.entities.key).to.equal('value');
+        expect(result.facts).to.include('fact1');
+      });
+    });
+
+    describe('needsRedistillation()', function() {
+
+      it('should return false for sequence 1', function() {
+        expect(ThreadContinuation.needsRedistillation(1)).to.be.false;
+      });
+
+      it('should return false for sequence 2', function() {
+        expect(ThreadContinuation.needsRedistillation(2)).to.be.false;
+      });
+
+      it('should return true for sequence 3 (interval of 3)', function() {
+        expect(ThreadContinuation.needsRedistillation(3)).to.be.true;
+      });
+
+      it('should return false for sequence 4', function() {
+        expect(ThreadContinuation.needsRedistillation(4)).to.be.false;
+      });
+
+      it('should return true for sequence 6', function() {
+        expect(ThreadContinuation.needsRedistillation(6)).to.be.true;
+      });
+
+      it('should return true for sequence 9', function() {
+        expect(ThreadContinuation.needsRedistillation(9)).to.be.true;
+      });
+
+      it('should return false for sequence 0', function() {
+        expect(ThreadContinuation.needsRedistillation(0)).to.be.false;
+      });
+    });
+  });
+
+  // ============================================================================
+  // THREAD CHAIN TESTS
+  // ============================================================================
+
+  describe('ThreadContinuation - Thread Chain', function() {
+
+    describe('createContinuationThread()', function() {
+
+      const mockParentThread = {
+        id: 'thread-123-abc',
+        title: 'Test Chat',
+        threadSequence: 1,
+        createdAt: '2025-01-01T00:00:00Z',
+        user: 'test@example.com'
+      };
+
+      const mockMemory = {
+        entities: { user: { name: 'Test' } },
+        facts: ['fact1'],
+        currentGoal: 'testing'
+      };
+
+      const mockSummary = {
+        summary: 'This is a test summary',
+        turnsCompacted: 50,
+        generatedAt: '2025-01-01T01:00:00Z'
+      };
+
+      const mockRecentTurns = [
+        { role: 'user', content: 'recent message 1' },
+        { role: 'assistant', content: 'recent response 1' }
+      ];
+
+      it('should create thread with new unique ID', function() {
+        const result = ThreadContinuation.createContinuationThread(
+          mockParentThread, mockMemory, mockSummary, mockRecentTurns
+        );
+
+        expect(result.id).to.include('thread-');
+        expect(result.id).to.not.equal(mockParentThread.id);
+      });
+
+      it('should link to parent thread', function() {
+        const result = ThreadContinuation.createContinuationThread(
+          mockParentThread, mockMemory, mockSummary, mockRecentTurns
+        );
+
+        expect(result.parentThread).to.equal(mockParentThread.id);
+        expect(result.childThread).to.be.null;
+      });
+
+      it('should increment thread sequence', function() {
+        const result = ThreadContinuation.createContinuationThread(
+          mockParentThread, mockMemory, mockSummary, mockRecentTurns
+        );
+
+        expect(result.threadSequence).to.equal(2);
+      });
+
+      it('should include memory block', function() {
+        const result = ThreadContinuation.createContinuationThread(
+          mockParentThread, mockMemory, mockSummary, mockRecentTurns
+        );
+
+        expect(result.memory).to.deep.equal(mockMemory);
+      });
+
+      it('should include inherited summary', function() {
+        const result = ThreadContinuation.createContinuationThread(
+          mockParentThread, mockMemory, mockSummary, mockRecentTurns
+        );
+
+        expect(result.inheritedSummary).to.equal(mockSummary.summary);
+      });
+
+      it('should include recent turns as messages', function() {
+        const result = ThreadContinuation.createContinuationThread(
+          mockParentThread, mockMemory, mockSummary, mockRecentTurns
+        );
+
+        expect(result.messages).to.deep.equal(mockRecentTurns);
+      });
+
+      it('should append (continued) to title', function() {
+        const result = ThreadContinuation.createContinuationThread(
+          mockParentThread, mockMemory, mockSummary, mockRecentTurns
+        );
+
+        expect(result.title).to.equal('Test Chat (continued)');
+      });
+
+      it('should generate new title if parent has no title', function() {
+        const parentNoTitle = { ...mockParentThread, title: null };
+        const result = ThreadContinuation.createContinuationThread(
+          parentNoTitle, mockMemory, mockSummary, mockRecentTurns
+        );
+
+        expect(result.title).to.include('Chat');
+      });
+
+      it('should preserve user from parent thread', function() {
+        const result = ThreadContinuation.createContinuationThread(
+          mockParentThread, mockMemory, mockSummary, mockRecentTurns
+        );
+
+        expect(result.user).to.equal(mockParentThread.user);
+      });
+
+      it('should include createdAt timestamp', function() {
+        const before = new Date().toISOString();
+        const result = ThreadContinuation.createContinuationThread(
+          mockParentThread, mockMemory, mockSummary, mockRecentTurns
+        );
+        const after = new Date().toISOString();
+
+        expect(result.createdAt).to.exist;
+        expect(result.createdAt >= before).to.be.true;
+        expect(result.createdAt <= after).to.be.true;
+      });
+
+      it('should reference original conversation start time', function() {
+        const result = ThreadContinuation.createContinuationThread(
+          mockParentThread, mockMemory, mockSummary, mockRecentTurns
+        );
+
+        expect(result.continuedFrom).to.equal(mockParentThread.createdAt);
+      });
+    });
+  });
+
+  // ============================================================================
+  // CONFIGURATION TESTS
+  // ============================================================================
+
+  describe('ThreadContinuation - Configuration', function() {
+
+    describe('CONTINUATION_CONFIG', function() {
+
+      it('should have tokenThreshold of 140000', function() {
+        expect(ThreadContinuation.CONTINUATION_CONFIG.tokenThreshold).to.equal(140000);
+      });
+
+      it('should have warningThreshold of 100000', function() {
+        expect(ThreadContinuation.CONTINUATION_CONFIG.warningThreshold).to.equal(100000);
+      });
+
+      it('should have messageThreshold of 80', function() {
+        expect(ThreadContinuation.CONTINUATION_CONFIG.messageThreshold).to.equal(80);
+      });
+
+      it('should have keepRecentTurns of 5', function() {
+        expect(ThreadContinuation.CONTINUATION_CONFIG.keepRecentTurns).to.equal(5);
+      });
+
+      it('should have redistillationInterval of 3', function() {
+        expect(ThreadContinuation.CONTINUATION_CONFIG.redistillationInterval).to.equal(3);
+      });
+
+      it('should use Opus model for extraction', function() {
+        expect(ThreadContinuation.CONTINUATION_CONFIG.extractionModel).to.include('opus');
+      });
+
+      it('should have archiveToJournal enabled', function() {
+        expect(ThreadContinuation.CONTINUATION_CONFIG.archiveToJournal).to.be.true;
+      });
+    });
+  });
+
+  // ============================================================================
+  // RULE-BASED EXTRACTION TESTS (No API Calls)
+  // ============================================================================
+
+  describe('ThreadContinuation - Rule-Based Extraction', function() {
+
+    describe('extractMemoryRuleBased()', function() {
+
+      it('should extract capitalized names', function() {
+        const messages = [
+          { role: 'user', content: 'My name is Alice Smith and I work with Bob Jones.' }
+        ];
+
+        const result = ThreadContinuation.extractMemoryRuleBased(messages, null);
+
+        expect(result.entities.mentionedNames).to.exist;
+        // The regex captures full names (e.g., "Alice Smith") not individual names
+        expect(result.entities.mentionedNames).to.include('Alice Smith');
+        expect(result.entities.mentionedNames).to.include('Bob Jones');
+      });
+
+      it('should extract URLs', function() {
+        const messages = [
+          { role: 'user', content: 'Check out https://example.com and https://test.org/page' }
+        ];
+
+        const result = ThreadContinuation.extractMemoryRuleBased(messages, null);
+
+        expect(result.entities.mentionedUrls).to.exist;
+        expect(result.entities.mentionedUrls).to.include('https://example.com');
+        expect(result.entities.mentionedUrls).to.include('https://test.org/page');
+      });
+
+      it('should extract code-related terms', function() {
+        const messages = [
+          { role: 'user', content: 'function myFunc() {} and class MyClass extends Base {}' }
+        ];
+
+        const result = ThreadContinuation.extractMemoryRuleBased(messages, null);
+
+        expect(result.entities.codeTerms).to.exist;
+        expect(result.entities.codeTerms).to.include('myFunc');
+        expect(result.entities.codeTerms).to.include('MyClass');
+      });
+
+      it('should preserve existing memory structure', function() {
+        const existing = {
+          entities: { existing: 'value' },
+          facts: ['existing fact'],
+          currentGoal: 'existing goal'
+        };
+
+        const messages = [
+          { role: 'user', content: 'Hello world' }
+        ];
+
+        const result = ThreadContinuation.extractMemoryRuleBased(messages, existing);
+
+        expect(result.entities.existing).to.equal('value');
+        expect(result.facts).to.include('existing fact');
+        expect(result.currentGoal).to.equal('existing goal');
+      });
+
+      it('should handle messages with complex content blocks', function() {
+        const messages = [
+          { role: 'user', content: [{ type: 'text', text: 'Hello Alice' }] }
+        ];
+
+        // Should not throw and should still work via JSON.stringify
+        const result = ThreadContinuation.extractMemoryRuleBased(messages, null);
+
+        expect(result).to.exist;
+        expect(result.entities).to.exist;
+      });
+
+      it('should limit extracted items', function() {
+        // Create messages with many names
+        const manyNames = Array.from({ length: 50 }, (_, i) => `Person${i}`).join(' ');
+        const messages = [
+          { role: 'user', content: manyNames }
+        ];
+
+        const result = ThreadContinuation.extractMemoryRuleBased(messages, null);
+
+        // Should be limited to 10 names
+        if (result.entities.mentionedNames) {
+          expect(result.entities.mentionedNames.length).to.be.lessThan(15);
+        }
+      });
+    });
+  });
+
+  // ============================================================================
+  // SUMMARY FALLBACK TESTS (No API Calls)
+  // ============================================================================
+
+  describe('ThreadContinuation - Summary Fallback', function() {
+
+    describe('generateSummaryFallback()', function() {
+
+      it('should use last 10 messages', function() {
+        const messages = generateMockMessages(20);
+        const result = ThreadContinuation.generateSummaryFallback(messages, null);
+
+        expect(result.summary).to.include('Recent conversation');
+      });
+
+      it('should mark as fallback', function() {
+        const messages = generateMockMessages(5);
+        const result = ThreadContinuation.generateSummaryFallback(messages, null);
+
+        expect(result.isFallback).to.be.true;
+      });
+
+      it('should include turnsCompacted count', function() {
+        const messages = generateMockMessages(15);
+        const result = ThreadContinuation.generateSummaryFallback(messages, null);
+
+        expect(result.turnsCompacted).to.equal(15);
+      });
+
+      it('should include generatedAt timestamp', function() {
+        const messages = generateMockMessages(5);
+        const before = new Date().toISOString();
+        const result = ThreadContinuation.generateSummaryFallback(messages, null);
+        const after = new Date().toISOString();
+
+        expect(result.generatedAt).to.exist;
+        expect(result.generatedAt >= before).to.be.true;
+        expect(result.generatedAt <= after).to.be.true;
+      });
+
+      it('should append to previous summary', function() {
+        const messages = generateMockMessages(5);
+        const previousSummary = 'Previous context here.';
+
+        const result = ThreadContinuation.generateSummaryFallback(messages, previousSummary);
+
+        expect(result.summary).to.include('Previous context here');
+        expect(result.summary).to.include('Recent conversation');
+      });
+
+      it('should truncate long message content', function() {
+        const messages = [
+          { role: 'user', content: 'x'.repeat(500) }
+        ];
+
+        const result = ThreadContinuation.generateSummaryFallback(messages, null);
+
+        // Content should be truncated to ~200 chars
+        expect(result.summary.length).to.be.lessThan(400);
+      });
+
+      it('should handle complex content blocks', function() {
+        const messages = [
+          { role: 'user', content: [{ type: 'text', text: 'Hello' }] }
+        ];
+
+        const result = ThreadContinuation.generateSummaryFallback(messages, null);
+
+        expect(result.summary).to.include('[complex content]');
+      });
+    });
+  });
+
+  // ============================================================================
+  // EXPORTS VERIFICATION
+  // ============================================================================
+
+  describe('ThreadContinuation - Module Exports', function() {
+
+    it('should export CONTINUATION_CONFIG', function() {
+      expect(ThreadContinuation.CONTINUATION_CONFIG).to.exist;
+    });
+
+    it('should export all Phase 1 functions', function() {
+      expect(typeof ThreadContinuation.estimateTokens).to.equal('function');
+      expect(typeof ThreadContinuation.estimateMessageTokens).to.equal('function');
+      expect(typeof ThreadContinuation.shouldContinue).to.equal('function');
+      expect(typeof ThreadContinuation.isContextExceededError).to.equal('function');
+      expect(typeof ThreadContinuation.getRecentTurns).to.equal('function');
+      expect(typeof ThreadContinuation.generateThreadId).to.equal('function');
+    });
+
+    it('should export all Phase 2 functions', function() {
+      expect(typeof ThreadContinuation.extractMemory).to.equal('function');
+      expect(typeof ThreadContinuation.extractMemoryWithLLM).to.equal('function');
+      expect(typeof ThreadContinuation.extractMemoryRuleBased).to.equal('function');
+      expect(typeof ThreadContinuation.generateSummary).to.equal('function');
+      expect(typeof ThreadContinuation.generateSummaryWithLLM).to.equal('function');
+      expect(typeof ThreadContinuation.generateSummaryFallback).to.equal('function');
+      expect(typeof ThreadContinuation.mergeMemory).to.equal('function');
+    });
+
+    it('should export all Phase 3 functions', function() {
+      expect(typeof ThreadContinuation.createContinuationThread).to.equal('function');
+      expect(typeof ThreadContinuation.needsRedistillation).to.equal('function');
+      expect(typeof ThreadContinuation.redistillMemory).to.equal('function');
+    });
+
+    it('should export main handler', function() {
+      expect(typeof ThreadContinuation.handleThreadContinuation).to.equal('function');
+    });
+  });
+
+  // ============================================================================
+  // MOCK HELPERS FOR INTEGRATION TESTS
+  // ============================================================================
+
+  /**
+   * Create a mock conversation object for testing
+   * @param {Object} overrides - Properties to override
+   * @returns {Object} Mock conversation
+   */
+  function createMockConversation(overrides = {}) {
+    return {
+      id: 'thread-test-123',
+      title: 'Test Conversation',
+      threadSequence: 1,
+      createdAt: '2025-01-01T00:00:00Z',
+      user: 'test@example.com',
+      messages: generateMockMessages(20),
+      memory: {
+        entities: { user: { name: 'Test User' } },
+        facts: ['fact1', 'fact2'],
+        currentGoal: 'testing'
+      },
+      inheritedSummary: null,
+      ...overrides
+    };
+  }
+
+  // ============================================================================
+  // INTEGRATION TESTS - handleThreadContinuation
+  // ============================================================================
+
+  describe('ThreadContinuation - Integration Tests', function() {
+
+    describe('handleThreadContinuation()', function() {
+
+      it('should complete full continuation flow successfully', function() {
+        // Create a conversation that would trigger continuation
+        const conversation = createMockConversation({
+          messages: generateMockMessages(100, { avgLength: 500 })
+        });
+
+        // Call the handler - this uses rule-based extraction (no API calls)
+        // and fallback summary since we're not mocking ClaudeApiUtils
+        const result = ThreadContinuation.handleThreadContinuation(
+          conversation,
+          'Continue our discussion'
+        );
+
+        // Verify successful completion
+        expect(result.success).to.be.true;
+        expect(result.newThread).to.exist;
+        expect(result.parentThreadId).to.equal(conversation.id);
+        expect(result.elapsed).to.be.greaterThan(0);
+
+        // Verify new thread structure
+        const newThread = result.newThread;
+        expect(newThread.id).to.include('thread-');
+        expect(newThread.id).to.not.equal(conversation.id);
+        expect(newThread.parentThread).to.equal(conversation.id);
+        expect(newThread.threadSequence).to.equal(2);
+        expect(newThread.memory).to.exist;
+        expect(newThread.inheritedSummary).to.exist;
+        expect(Array.isArray(newThread.messages)).to.be.true;
+        expect(newThread.user).to.equal(conversation.user);
+
+        // Verify parent was updated to link to child
+        expect(conversation.childThread).to.equal(newThread.id);
+      });
+
+      it('should complete continuation even when archive fails', function() {
+        // Create conversation
+        const conversation = createMockConversation();
+
+        // The archive might fail (e.g., DriveJournal not available in test)
+        // but continuation should still succeed
+        const result = ThreadContinuation.handleThreadContinuation(
+          conversation,
+          'Test message'
+        );
+
+        // Continuation should succeed regardless of archive status
+        expect(result.success).to.be.true;
+        expect(result.newThread).to.exist;
+      });
+
+      it('should use rule-based extraction as fallback', function() {
+        // Create conversation with extractable content
+        const conversation = createMockConversation({
+          messages: [
+            { role: 'user', content: 'My name is Alice Smith and I work at https://example.com' },
+            { role: 'assistant', content: 'Hello Alice! I see you work at example.com.' },
+            { role: 'user', content: 'Yes, I am building a function calculateTotal() for the project.' },
+            { role: 'assistant', content: 'Great! Let me help with calculateTotal.' }
+          ]
+        });
+
+        const result = ThreadContinuation.handleThreadContinuation(
+          conversation,
+          'Continue'
+        );
+
+        expect(result.success).to.be.true;
+
+        // Memory should have extracted entities from rule-based extraction
+        const memory = result.newThread.memory;
+        expect(memory.entities).to.exist;
+
+        // Should have extracted names, URLs, or code terms
+        const hasExtractedContent = 
+          (memory.entities.mentionedNames && memory.entities.mentionedNames.length > 0) ||
+          (memory.entities.mentionedUrls && memory.entities.mentionedUrls.length > 0) ||
+          (memory.entities.codeTerms && memory.entities.codeTerms.length > 0);
+
+        expect(hasExtractedContent).to.be.true;
+      });
+
+      it('should use fallback summary generation', function() {
+        const conversation = createMockConversation({
+          messages: [
+            { role: 'user', content: 'Hello, how are you?' },
+            { role: 'assistant', content: 'I am doing well, thank you!' },
+            { role: 'user', content: 'Can you help me with a task?' },
+            { role: 'assistant', content: 'Of course! What do you need?' }
+          ]
+        });
+
+        const result = ThreadContinuation.handleThreadContinuation(
+          conversation,
+          'Continue'
+        );
+
+        expect(result.success).to.be.true;
+
+        // Summary should exist and contain recent conversation indicator
+        const summary = result.newThread.inheritedSummary;
+        expect(summary).to.exist;
+        expect(summary).to.include('Recent conversation');
+      });
+    });
+  });
+
+  // ============================================================================
+  // SCENARIO TESTS - Multi-Continuation Chains
+  // ============================================================================
+
+  describe('ThreadContinuation - Scenario Tests', function() {
+
+    describe('Multi-continuation chain', function() {
+
+      it('should maintain proper chain across 5 continuations', function() {
+        const threads = [];
+
+        // Create initial conversation
+        let currentConversation = createMockConversation({
+          id: 'thread-original',
+          threadSequence: 1
+        });
+        threads.push(currentConversation);
+
+        // Perform 5 continuations
+        for (let i = 0; i < 5; i++) {
+          const result = ThreadContinuation.handleThreadContinuation(
+            currentConversation,
+            `Message ${i + 1}`
+          );
+
+          expect(result.success).to.be.true;
+
+          // Verify sequence increments
+          expect(result.newThread.threadSequence).to.equal(i + 2);
+
+          // Verify parent link
+          expect(result.newThread.parentThread).to.equal(currentConversation.id);
+
+          // Verify child link was set on parent
+          expect(currentConversation.childThread).to.equal(result.newThread.id);
+
+          // Move to next thread
+          currentConversation = {
+            ...result.newThread,
+            messages: generateMockMessages(10) // Add some messages
+          };
+          threads.push(currentConversation);
+        }
+
+        // Verify final thread sequence
+        expect(threads[threads.length - 1].threadSequence).to.equal(6);
+
+        // Verify chain integrity (no circular references)
+        const seenIds = new Set();
+        for (const thread of threads) {
+          expect(seenIds.has(thread.id)).to.be.false;
+          seenIds.add(thread.id);
+        }
+      });
+    });
+
+    describe('Memory redistillation trigger', function() {
+
+      it('should trigger redistillation at sequence 3', function() {
+        // needsRedistillation checks if threadSequence % 3 === 0
+        // So sequence 3, 6, 9 should trigger redistillation
+
+        expect(ThreadContinuation.needsRedistillation(2)).to.be.false;
+        expect(ThreadContinuation.needsRedistillation(3)).to.be.true;
+        expect(ThreadContinuation.needsRedistillation(4)).to.be.false;
+        expect(ThreadContinuation.needsRedistillation(5)).to.be.false;
+        expect(ThreadContinuation.needsRedistillation(6)).to.be.true;
+      });
+
+      it('should handle continuation at redistillation boundary', function() {
+        // Create conversation at sequence 2 (next will be 3, triggering redistillation)
+        const conversation = createMockConversation({
+          threadSequence: 2,
+          memory: {
+            entities: { user: { name: 'Test' } },
+            facts: Array.from({ length: 25 }, (_, i) => `fact-${i}`),
+            currentGoal: 'testing redistillation'
+          }
+        });
+
+        const result = ThreadContinuation.handleThreadContinuation(
+          conversation,
+          'Continue'
+        );
+
+        expect(result.success).to.be.true;
+        expect(result.newThread.threadSequence).to.equal(3);
+
+        // Memory should exist (redistillation may have been attempted)
+        expect(result.newThread.memory).to.exist;
+      });
+    });
+
+    describe('Threshold boundary tests', function() {
+
+      it('should trigger at exact token threshold', function() {
+        // Default threshold is 140000
+        expect(ThreadContinuation.shouldContinue(139999, 1)).to.be.false;
+        expect(ThreadContinuation.shouldContinue(140000, 1)).to.be.true;
+        expect(ThreadContinuation.shouldContinue(140001, 1)).to.be.true;
+      });
+
+      it('should trigger at exact message threshold', function() {
+        // Default threshold is 80
+        expect(ThreadContinuation.shouldContinue(1, 79)).to.be.false;
+        expect(ThreadContinuation.shouldContinue(1, 80)).to.be.true;
+        expect(ThreadContinuation.shouldContinue(1, 81)).to.be.true;
+      });
+
+      it('should trigger if either threshold exceeded', function() {
+        // Token exceeded, message not
+        expect(ThreadContinuation.shouldContinue(150000, 50)).to.be.true;
+
+        // Message exceeded, token not
+        expect(ThreadContinuation.shouldContinue(50000, 100)).to.be.true;
+
+        // Neither exceeded
+        expect(ThreadContinuation.shouldContinue(50000, 50)).to.be.false;
+
+        // Both exceeded
+        expect(ThreadContinuation.shouldContinue(150000, 100)).to.be.true;
+      });
+    });
+  });
+
+  // ============================================================================
+  // EDGE CASE TESTS
+  // ============================================================================
+
+  describe('ThreadContinuation - Edge Cases', function() {
+
+    describe('Empty/minimal conversation handling', function() {
+
+      it('should handle single message conversation', function() {
+        const conversation = createMockConversation({
+          messages: [
+            { role: 'user', content: 'Hello, this is my only message.' }
+          ]
+        });
+
+        const result = ThreadContinuation.handleThreadContinuation(
+          conversation,
+          'Continue'
+        );
+
+        expect(result.success).to.be.true;
+        expect(result.newThread.messages).to.have.length(1);
+      });
+
+      it('should handle conversation with empty messages array', function() {
+        const conversation = createMockConversation({
+          messages: []
+        });
+
+        const result = ThreadContinuation.handleThreadContinuation(
+          conversation,
+          'Continue'
+        );
+
+        // Should still succeed, just with empty recent turns
+        expect(result.success).to.be.true;
+        expect(result.newThread.messages).to.have.length(0);
+      });
+
+      it('should preserve user message only (no assistant response yet)', function() {
+        const conversation = createMockConversation({
+          messages: [
+            { role: 'user', content: 'Question 1' },
+            { role: 'assistant', content: 'Answer 1' },
+            { role: 'user', content: 'Question 2 (pending)' }
+          ]
+        });
+
+        const result = ThreadContinuation.handleThreadContinuation(
+          conversation,
+          'Continue'
+        );
+
+        expect(result.success).to.be.true;
+
+        // Recent turns should include the pending user message
+        const recentMessages = result.newThread.messages;
+        const hasUserQuestion2 = recentMessages.some(
+          m => m.content === 'Question 2 (pending)'
+        );
+        expect(hasUserQuestion2).to.be.true;
+      });
+    });
+
+    describe('Title generation edge cases', function() {
+
+      it('should handle already-continued titles', function() {
+        const conversation = createMockConversation({
+          title: 'My Chat (continued)'
+        });
+
+        const result = ThreadContinuation.handleThreadContinuation(
+          conversation,
+          'Continue'
+        );
+
+        expect(result.success).to.be.true;
+        // Current implementation appends (continued) again
+        expect(result.newThread.title).to.equal('My Chat (continued) (continued)');
+      });
+
+      it('should generate title when parent has none', function() {
+        const conversation = createMockConversation({
+          title: null
+        });
+
+        const result = ThreadContinuation.handleThreadContinuation(
+          conversation,
+          'Continue'
+        );
+
+        expect(result.success).to.be.true;
+        expect(result.newThread.title).to.exist;
+        expect(result.newThread.title).to.include('Chat');
+      });
+
+      it('should handle empty string title', function() {
+        const conversation = createMockConversation({
+          title: ''
+        });
+
+        const result = ThreadContinuation.handleThreadContinuation(
+          conversation,
+          'Continue'
+        );
+
+        expect(result.success).to.be.true;
+        // Empty string is falsy, so should generate new title
+        expect(result.newThread.title).to.exist;
+      });
+    });
+
+    describe('Mixed message types', function() {
+
+      it('should estimate tokens for mixed content correctly', function() {
+        const messages = [
+          { role: 'user', content: 'Here is my question with text' },
+          { role: 'assistant', content: [
+            { type: 'text', text: 'Let me help you.' },
+            { type: 'tool_use', id: 'tool_1', name: 'search', input: { query: 'test' } }
+          ]},
+          { role: 'user', content: [
+            { type: 'tool_result', tool_use_id: 'tool_1', content: 'Search results here' }
+          ]},
+          { role: 'assistant', content: 'Based on the search results...' },
+          { role: 'user', content: [
+            { type: 'image', source: { type: 'base64', data: 'abc123' } },
+            { type: 'text', text: 'What do you see in this image?' }
+          ]}
+        ];
+
+        // Estimate tokens for these mixed messages
+        const tokenEstimate = ThreadContinuation.estimateTokens('', messages, []);
+
+        // Should be sum of all components:
+        // - text messages
+        // - tool_use blocks (JSON dense)
+        // - tool_result blocks
+        // - image (1500 tokens)
+        // With 20% margin
+
+        // Image alone is 1500 tokens, so total should be > 1500
+        expect(tokenEstimate).to.be.greaterThan(1500);
+
+        // But shouldn't be unreasonably high for this small set
+        expect(tokenEstimate).to.be.lessThan(5000);
+      });
+
+      it('should handle conversation with images in continuation', function() {
+        const conversation = createMockConversation({
+          messages: [
+            { role: 'user', content: [
+              { type: 'image', source: { type: 'base64', data: 'imagedata' } },
+              { type: 'text', text: 'Describe this image' }
+            ]},
+            { role: 'assistant', content: 'I see an interesting image.' }
+          ]
+        });
+
+        const result = ThreadContinuation.handleThreadContinuation(
+          conversation,
+          'Continue'
+        );
+
+        expect(result.success).to.be.true;
+        expect(result.newThread.messages).to.have.length(2);
+      });
+
+      it('should handle tool_use and tool_result in continuation', function() {
+        const conversation = createMockConversation({
+          messages: [
+            { role: 'user', content: 'Search for something' },
+            { role: 'assistant', content: [
+              { type: 'tool_use', id: 'tool_123', name: 'search', input: { q: 'test' } }
+            ]},
+            { role: 'user', content: [
+              { type: 'tool_result', tool_use_id: 'tool_123', content: 'Found results' }
+            ]},
+            { role: 'assistant', content: 'Based on the search...' }
+          ]
+        });
+
+        const result = ThreadContinuation.handleThreadContinuation(
+          conversation,
+          'Continue'
+        );
+
+        expect(result.success).to.be.true;
+
+        // All messages should be preserved in recent turns
+        expect(result.newThread.messages.length).to.be.greaterThan(0);
+      });
+    });
+  });
+
+  // ============================================================================
+  // RUN ALL TESTS
+  // ============================================================================
+
+  /**
+   * Run all ThreadContinuation unit tests
+   * @returns {string} Test results summary
+   */
+  function runAllTests() {
+    const mocha = require('test-framework/mocha-adapter');
+
+    mocha.resetContext();
+
+    // Re-register tests by calling describe functions
+    // (They're already registered when this module loads)
+
+    const results = mocha.executeAll();
+    const formatted = mocha.formatResults(results);
+    const summary = mocha.getSummary(results);
+
+    console.log(formatted);
+    console.log('\n' + '='.repeat(60));
+    console.log('ThreadContinuation Unit Test Summary');
+    console.log('='.repeat(60));
+    console.log(`Total:   ${summary.total}`);
+    console.log(`Passed:  ${summary.passed}`);
+    console.log(`Failed:  ${summary.failed}`);
+    console.log(`Pass Rate: ${summary.passRate}`);
+    console.log('='.repeat(60));
+
+    return {
+      formatted,
+      summary,
+      results
+    };
+  }
+
+  // Export test runner
+  module.exports = { runAllTests };
+}
+
+__defineModule__(_main);

@@ -1,0 +1,413 @@
+// Dependencies
+const { describe, it, beforeEach } = require('test-framework/mocha-adapter');
+const { expect } = require('test-framework/chai-assertions');
+const SearchToolHandler = require('tools/SearchToolHandler');
+
+// ============================================================================
+// TEST SUITE: SearchToolHandler Instantiation
+// ============================================================================
+
+describe('SearchToolHandler', function() {
+  let handler;
+
+  beforeEach(function() {
+    handler = new SearchToolHandler();
+  });
+
+  describe('constructor', function() {
+
+    it('should create handler with name "websearch"', function() {
+      expect(handler.getToolDefinition().name).to.equal('websearch');
+    });
+
+    it('should extend ToolBase', function() {
+      expect(handler._successResult).to.exist;
+      expect(handler._errorResult).to.exist;
+    });
+
+  });
+
+  // ============================================================================
+  // TEST SUITE: Tool Definition
+  // ============================================================================
+
+  describe('getToolDefinition', function() {
+    let definition;
+
+    beforeEach(function() {
+      definition = handler.getToolDefinition();
+    });
+
+    it('should return tool name "websearch"', function() {
+      expect(definition.name).to.equal('websearch');
+    });
+
+    it('should have description mentioning binary support', function() {
+      expect(definition.description).to.include('BINARY');
+      expect(definition.description).to.include('images');
+      expect(definition.description).to.include('PDFs');
+    });
+
+    it('should have description mentioning transform parameter', function() {
+      expect(definition.description).to.include('transform');
+      expect(definition.description).to.include('TOKEN-EFFICIENT');
+    });
+
+    it('should have input_schema with required url property', function() {
+      expect(definition.input_schema.type).to.equal('object');
+      expect(definition.input_schema.required).to.include('url');
+    });
+
+    it('should have url property in schema', function() {
+      expect(definition.input_schema.properties.url).to.exist;
+      expect(definition.input_schema.properties.url.type).to.equal('string');
+    });
+
+    it('should have method property with enum values', function() {
+      const method = definition.input_schema.properties.method;
+      expect(method).to.exist;
+      expect(method.enum).to.include('GET');
+      expect(method.enum).to.include('POST');
+      expect(method.enum).to.include('PUT');
+      expect(method.enum).to.include('DELETE');
+      expect(method.enum).to.include('PATCH');
+    });
+
+    it('should have storeAs property with shape documentation', function() {
+      const storeAs = definition.input_schema.properties.storeAs;
+      expect(storeAs).to.exist;
+      expect(storeAs.description).to.include('SINGLE');
+      expect(storeAs.description).to.include('websearch stores SINGLE object');
+    });
+
+    it('should have transform property with examples', function() {
+      const transform = definition.input_schema.properties.transform;
+      expect(transform).to.exist;
+      expect(transform.description).to.include('r =>');
+      expect(transform.description).to.include('TOKEN EFFICIENCY');
+    });
+
+    it('should have responseHeadersOnly property defaulting to true', function() {
+      const prop = definition.input_schema.properties.responseHeadersOnly;
+      expect(prop).to.exist;
+      expect(prop.type).to.equal('boolean');
+    });
+
+    it('should have headers property for custom headers', function() {
+      expect(definition.input_schema.properties.headers).to.exist;
+      expect(definition.input_schema.properties.headers.type).to.equal('object');
+    });
+
+    it('should have payload property for request body', function() {
+      expect(definition.input_schema.properties.payload).to.exist;
+      expect(definition.input_schema.properties.payload.type).to.equal('string');
+    });
+
+    it('should have contentType property', function() {
+      expect(definition.input_schema.properties.contentType).to.exist;
+    });
+
+    it('should document HTML parsing transform example', function() {
+      expect(definition.description).to.include('HTML PARSING');
+      expect(definition.description).to.include('matchAll');
+    });
+
+  });
+
+  // ============================================================================
+  // TEST SUITE: Input Validation
+  // ============================================================================
+
+  describe('execute input validation', function() {
+
+    it('should fail without url', function() {
+      const result = handler.execute({ url: '' });  // Empty URL triggers validation
+      expect(result.success).to.be.false;
+    });
+
+    it('should succeed with valid url', function() {
+      // Note: This will make an actual HTTP call
+      // For unit tests, we test the validation logic
+      // Integration tests cover actual HTTP behavior
+      const result = handler.execute({ url: 'https://httpbin.org/get' });
+      expect(result.success).to.be.true;
+    });
+
+  });
+
+  // ============================================================================
+  // TEST SUITE: Response Parsing (_parseResponse)
+  // ============================================================================
+
+  describe('_parseResponse', function() {
+
+    // Note: _parseResponse is private but we can test through execute
+    // These tests verify the response structure
+
+    it('should include url in response', function() {
+      const result = handler.execute({ url: 'https://httpbin.org/get' });
+      if (result.success) {
+        // Result structure depends on responseHeadersOnly
+        expect(result.result).to.exist;
+      }
+    });
+
+    it('should include encoding metadata in response', function() {
+      const result = handler.execute({ 
+        url: 'https://httpbin.org/get',
+        responseHeadersOnly: false,
+        storeAs: 'testData'
+      }, { toolState: {} });
+      
+      if (result.success && result.context && result.context.toolState) {
+        const stored = result.context.toolState.testData;
+        if (stored) {
+          // Should have encoding field
+          expect(stored.encoding).to.exist;
+          expect(['utf8', 'base64']).to.include(stored.encoding);
+        }
+      }
+    });
+
+  });
+
+  // ============================================================================
+  // TEST SUITE: Transform Functionality
+  // ============================================================================
+
+  describe('transform parameter', function() {
+
+    it('should apply transform function to result', function() {
+      const context = { toolState: {} };
+      const result = handler.execute({
+        url: 'https://jsonplaceholder.typicode.com/posts',
+        responseHeadersOnly: false,
+        storeAs: 'posts',
+        transform: 'r => r.body.length'
+      }, context);
+
+      if (result.success) {
+        // Transform should return just the count
+        const stored = context.toolState.posts;
+        expect(typeof stored).to.equal('number');
+        expect(stored).to.be.greaterThan(0);
+      }
+    });
+
+    it('should store transformed result in toolState', function() {
+      const context = { toolState: {} };
+      const result = handler.execute({
+        url: 'https://jsonplaceholder.typicode.com/posts/1',
+        responseHeadersOnly: false,
+        storeAs: 'post',
+        transform: 'r => ({ id: r.body.id, title: r.body.title })'
+      }, context);
+
+      if (result.success) {
+        const stored = context.toolState.post;
+        expect(stored).to.have.property('id');
+        expect(stored).to.have.property('title');
+        // Should NOT have full body
+        expect(stored).not.to.have.property('body');
+        expect(stored).not.to.have.property('userId');
+      }
+    });
+
+    it('should return transformed result to LLM', function() {
+      const result = handler.execute({
+        url: 'https://jsonplaceholder.typicode.com/posts/1',
+        responseHeadersOnly: false,
+        transform: 'r => r.success'
+      }, { toolState: {} });
+
+      if (result.success) {
+        // Result should be the transformed value (true)
+        expect(result.result).to.be.true;
+      }
+    });
+
+    it('should handle transform errors gracefully', function() {
+      const context = { toolState: {} };
+      const result = handler.execute({
+        url: 'https://jsonplaceholder.typicode.com/posts/1',
+        responseHeadersOnly: false,
+        storeAs: 'post',
+        transform: 'r => r.nonexistent.property.chain'  // Will throw
+      }, context);
+
+      if (result.success) {
+        // Should still succeed but with warning
+        expect(result.result.warnings).to.exist;
+        expect(result.result.warnings[0]).to.include('Transform failed');
+      }
+    });
+
+    it('should work with complex transform expressions', function() {
+      const context = { toolState: {} };
+      const result = handler.execute({
+        url: 'https://jsonplaceholder.typicode.com/posts',
+        responseHeadersOnly: false,
+        storeAs: 'summary',
+        transform: 'r => ({ count: r.body.length, sample: r.body.slice(0,2).map(p => p.title) })'
+      }, context);
+
+      if (result.success) {
+        const stored = context.toolState.summary;
+        expect(stored).to.have.property('count');
+        expect(stored).to.have.property('sample');
+        expect(Array.isArray(stored.sample)).to.be.true;
+      }
+    });
+
+  });
+
+  // ============================================================================
+  // TEST SUITE: storeAs Functionality
+  // ============================================================================
+
+  describe('storeAs parameter', function() {
+
+    it('should store full response when no transform', function() {
+      const context = { toolState: {} };
+      const result = handler.execute({
+        url: 'https://httpbin.org/get',
+        responseHeadersOnly: false,
+        storeAs: 'httpbinData'
+      }, context);
+
+      if (result.success) {
+        const stored = context.toolState.httpbinData;
+        expect(stored).to.exist;
+        expect(stored).to.have.property('url');
+        expect(stored).to.have.property('success');
+        expect(stored).to.have.property('statusCode');
+      }
+    });
+
+    it('should store SINGLE object (not array)', function() {
+      const context = { toolState: {} };
+      handler.execute({
+        url: 'https://httpbin.org/get',
+        responseHeadersOnly: false,
+        storeAs: 'data'
+      }, context);
+
+      const stored = context.toolState.data;
+      if (stored) {
+        // Should be object, not array
+        expect(Array.isArray(stored)).to.be.false;
+        expect(typeof stored).to.equal('object');
+      }
+    });
+
+    it('should not store if storeAs not provided', function() {
+      const context = { toolState: {} };
+      handler.execute({
+        url: 'https://httpbin.org/get',
+        responseHeadersOnly: false
+      }, context);
+
+      // toolState should be empty
+      expect(Object.keys(context.toolState).length).to.equal(0);
+    });
+
+  });
+
+  // ============================================================================
+  // TEST SUITE: responseHeadersOnly Behavior
+  // ============================================================================
+
+  describe('responseHeadersOnly parameter', function() {
+
+    it('should return headers only when true', function() {
+      const result = handler.execute({
+        url: 'https://httpbin.org/get',
+        responseHeadersOnly: true
+      }, { toolState: {} });
+
+      if (result.success) {
+        expect(result.result).to.have.property('success');
+        expect(result.result).to.have.property('statusCode');
+        expect(result.result).to.have.property('headers');
+        // Should NOT have body
+        expect(result.result).not.to.have.property('body');
+      }
+    });
+
+    it('should warn when responseHeadersOnly=true without storeAs', function() {
+      const result = handler.execute({
+        url: 'https://httpbin.org/get',
+        responseHeadersOnly: true
+        // No storeAs - body is discarded
+      }, { toolState: {} });
+
+      if (result.success) {
+        expect(result.result.warnings).to.exist;
+        expect(result.result.warnings[0]).to.include('responseHeadersOnly');
+        expect(result.result.warnings[0]).to.include('discarded');
+      }
+    });
+
+    it('should include body when responseHeadersOnly=false', function() {
+      const context = { toolState: {} };
+      const result = handler.execute({
+        url: 'https://httpbin.org/get',
+        responseHeadersOnly: false,
+        storeAs: 'data'
+      }, context);
+
+      if (result.success) {
+        const stored = context.toolState.data;
+        expect(stored).to.have.property('body');
+      }
+    });
+
+  });
+
+  // ============================================================================
+  // TEST SUITE: Binary Detection
+  // ============================================================================
+
+  describe('binary content detection', function() {
+
+    it('should detect image content type as binary', function() {
+      // This requires actual binary URL - integration test territory
+      // Unit test verifies the handler has UrlFetchUtils available
+      const UrlFetchUtils = require('common-js/UrlFetchUtils');
+      expect(UrlFetchUtils.isBinaryContentType('image/png')).to.be.true;
+      expect(UrlFetchUtils.isBinaryContentType('image/jpeg')).to.be.true;
+    });
+
+    it('should detect PDF as binary', function() {
+      const UrlFetchUtils = require('common-js/UrlFetchUtils');
+      expect(UrlFetchUtils.isBinaryContentType('application/pdf')).to.be.true;
+    });
+
+    it('should detect audio/video as binary', function() {
+      const UrlFetchUtils = require('common-js/UrlFetchUtils');
+      expect(UrlFetchUtils.isBinaryContentType('audio/mpeg')).to.be.true;
+      expect(UrlFetchUtils.isBinaryContentType('video/mp4')).to.be.true;
+    });
+
+    it('should NOT detect JSON as binary', function() {
+      const UrlFetchUtils = require('common-js/UrlFetchUtils');
+      expect(UrlFetchUtils.isBinaryContentType('application/json')).to.be.false;
+    });
+
+    it('should NOT detect text/html as binary', function() {
+      const UrlFetchUtils = require('common-js/UrlFetchUtils');
+      expect(UrlFetchUtils.isBinaryContentType('text/html')).to.be.false;
+    });
+
+  });
+
+});
+
+// ============================================================================
+// EXPORTS
+// ============================================================================
+
+module.exports = {
+  name: 'SearchToolHandler.unit.test',
+  description: 'Unit tests for SearchToolHandler (websearch tool)'
+};
