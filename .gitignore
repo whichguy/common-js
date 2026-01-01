@@ -1,0 +1,16 @@
+# Authentication tokens - NEVER commit
+.auth/
+*.tokens.json
+
+# Backup files
+*.bak
+*.backup
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
