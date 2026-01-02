@@ -907,8 +907,8 @@ const handleMessageSent = (response) => {
   if (!response) {
     // Check if thinking messages arrived successfully (indicates server completed work)
     // This can happen when google.script.run times out but server work succeeded
-    // google.script.run has a 30-second timeout, but Claude API calls with extended
-    // thinking can exceed this limit.
+    // When Apps Script function execution times out (6 min consumer, 30 min Workspace),
+    // neither success nor failure callback fires - the call just hangs.
     const currentRequestId = activeRequestId;
     const currentRequestMessages = currentRequestId ? 
       allThinkingMessagesByRequest.get(currentRequestId) || [] : [];
