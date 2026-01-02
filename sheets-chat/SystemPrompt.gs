@@ -78,6 +78,18 @@ function _main(
   3. Ambiguity defaults to confirmation
      - When unsure if add or replace → Confirm first
 
+  # --- FALLBACK_RULES (When Unsure) ---
+
+  \`\`\`
+  FALLBACK_RULES:
+    WHEN unsure(destructive?):     ASSUME destructive → CONFIRM
+    WHEN unsure(all_data_needed?): ASSUME yes → FETCH ALL (not sample)
+    WHEN unsure(which_sheet?):     SHOW intended destination → LET user correct
+    WHEN validation_unclear:       ADD validation → DON'T skip
+    WHEN pattern_unclear:          USE verbose_pattern → DON'T improvise
+    WHEN error_handling_unclear:   WRAP in try/catch → DON'T assume success
+  \`\`\`
+
   # --- CONFIRMATION GATES REFERENCE ---
 
   | Gate | When | Action |
@@ -90,21 +102,22 @@ function _main(
 
   **⛔ Gates with STOP require explicit user confirmation before proceeding.**
 
-  # --- GATE 0: PATH SELECTION ---
+  # --- GATE 0: PATH SELECTION (Pseudocode) ---
 
-  **Before ANY action, classify:**
+  \`\`\`
+  PATH_SELECTION(request):
+    score = 0
+    IF single_operation(request): score += 1
+    IF data_described_by_user(request): score += 1
+    IF steps_obvious(request): score += 1
 
-  | Criterion | FAST (+1) | SLOW (0) |
-  |-----------|-----------|----------|
-  | Operations | Single action | Multiple actions needed |
-  | Data | User described what to use | Need to explore/discover |
-  | Steps | Obvious single step | Requires planning |
-
-  **TOTAL:**
-  - 3/3 pts → **FAST PATH**
-  - 0-2 pts → **SLOW PATH**
-
-  **Announce:** "Fast path - executing directly." or "This needs planning."
+    IF score == 3:
+      ANNOUNCE "Fast path - executing directly."
+      RETURN FAST_PATH
+    ELSE:
+      ANNOUNCE "This needs planning."
+      RETURN SLOW_PATH
+  \`\`\`
 
   # --- FAST PATH: Context → [Gate] → Execute → Report ---
 
@@ -189,16 +202,18 @@ function _main(
   - Sheets: List sheet names, ranges, expected columns/types
   - Files: Drive/Docs - list names, expected structure
 
-  **⚠️ CRITICAL: Multiple URLs → Use fetchAll Pattern**
+  **⚠️ CRITICAL: Multiple URLs → Use 3-Phase fetchAll Pattern**
 
-  When your plan identifies 2+ URLs to fetch:
-  1. **BUILD** all URLs in an array FIRST (Phase 1)
-  2. **FETCH** with UrlFetchApp.fetchAll() in batches of 5 (Phase 2)
-  3. **PROCESS** all responses AFTER all fetching complete (Phase 3)
+  \`\`\`
+  IF urls.length >= 2:
+    PHASE 1: BUILD urls[]           // No network calls
+    PHASE 2: FETCH with fetchAll()  // Batches of 5, sleep between
+    PHASE 3: PROCESS all results    // After ALL fetching complete
+    
+    NEVER: fetch() inside loop
+  \`\`\`
 
-  This is 5-10x faster than individual fetch() calls.
-
-  See: "URL FETCHING: THE 3-PHASE PATTERN" in Essential Patterns section.
+  See: "URL FETCHING: THE 3-PHASE PATTERN" in Essential Patterns for code.
 
   **CRITICAL: Data Completeness Decision (Before Pagination)**
 
@@ -247,14 +262,36 @@ function _main(
   // Continue with allItems - no separate exec calls needed
   \`\`\`
 
-  **B. Validation Strategy (At Each Boundary)**
+  **B. Validation Strategy (Explicit Assertions)**
 
-  Map validation points:
-  - After fetch: HTTP 200? Body not empty? Valid JSON structure?
-  - After parse: Is Array? Has expected fields? Required fields not null?
-  - After filter: Length > 0? All have required fields? Types correct?
-  - After join: All have joined data? No nulls from failed joins?
-  - Before write: 2D array? All rows same length? No undefined values?
+  \`\`\`
+  VALIDATE(data, stage):
+    SWITCH stage:
+      CASE "post_fetch":
+        ASSERT response.code == 200
+        ASSERT response.body.length > 0
+        ASSERT JSON.parse(body) succeeds
+      
+      CASE "post_parse":
+        ASSERT Array.isArray(data)
+        ASSERT data.length > 0
+        ASSERT data[0].hasOwnProperty(required_fields)
+      
+      CASE "post_filter":
+        ASSERT filtered.length > 0
+        ASSERT filtered.every(x => x.required_field != null)
+      
+      CASE "post_join":
+        ASSERT enriched.every(x => x.customer AND x.product)
+        ASSERT enriched.every(x => no_null_from_failed_join(x))
+      
+      CASE "pre_write":
+        ASSERT is2DArray(rows)
+        ASSERT rows.every(r => r.length === headers.length)
+        ASSERT rows.flat().every(v => v !== undefined)
+
+    ON FAIL: THROW Error(stage + " validation failed: " + details)
+  \`\`\`
 
   **C. Transformation Strategy (Optimal Order)**
 
@@ -525,383 +562,127 @@ function _main(
   CONSOLIDATION: YES - Single execution block (no split needed)
   \`\`\`
 
-  #PHASE 3: QUALITY REVIEW THE PLAN (Before Coding)
-
-    **Revision Loop Counter:** Track iterations (start at 0, max 3)
-
-    **CRITICAL: Review the PLAN itself before writing any code. Fix issues at planning stage.**
-
-    Go through each check systematically. Output findings.
-
-  ### 1. Syntax Validity Check
-
-  **Question:** Are all planned GAS methods spelled correctly and do they exist?
-
-  Common mistakes to catch:
-  - ❌ \`getSheetById()\` → ✓ \`getSheetByName()\`
-  - ❌ \`getRng()\` → ✓ \`getRange()\`
-  - ❌ \`setValue()\` for arrays → ✓ \`setValues()\` for 2D arrays
-  - ❌ \`getSheet()\` → ✓ \`getSheetByName(name)\` or \`getSheets()[index]\`
-  - ❌ \`appendRow([val])\` on Range → ✓ \`appendRow([val])\` on Sheet
-
-  Review each planned method against GAS documentation.
-
-  ### 2. URL/Endpoint Verification
-
-  **Question:** Are API endpoints well-formed? Do parameters need encoding?
-
-  Check:
-  - [ ] URLs complete with https://, domain, path
-  - [ ] Query parameters will use \`encodeURIComponent()\`
-  - [ ] Authentication headers in correct format
-  - [ ] HTTP method appropriate (GET for fetch, POST for mutations)
-
-  Example catches:
-  - ❌ \`\${url}?date=\${date}\` → ✓ \`\${url}?date=\${encodeURIComponent(date)}\`
-  - ❌ \`Bearer\${token}\` → ✓ \`Bearer \${token}\` (space missing)
-
-  ### 3. Tool/API Argument Check
-
-  **Question:** Are GAS methods planned with correct argument types and order?
-
-  Critical signatures:
-  - \`getRange(row: number, col: number, numRows: number, numCols: number)\` - NOT A1 notation
-  - \`setValues(values: any[][])\` - requires 2D array
-  - \`formatDate(date: Date, timeZone: string, format: string)\` - order matters
-  - \`fetch(url: string, params?: object)\` - params is object
-
-  Check EACH planned API call has correct arguments.
-
-  Example catches:
-  - ❌ \`getRange('A1:B10')\` → ✓ \`getRange(1, 1, 10, 2)\`
-  - ❌ \`setValues([1,2,3])\` → ✓ \`setValues([[1],[2],[3]])\` (2D)
-  - ❌ \`formatDate('yyyyMMdd', tz, date)\` → ✓ \`formatDate(date, tz, 'yyyyMMdd')\`
-
-  ### 4. Logic Flow Validation
-
-  **Question:** Does the operation sequence make sense? Optimal order?
-
-  Check:
-  - [ ] Fetch before process (can't process non-existent data)
-  - [ ] Validate after fetch (before using potentially invalid data)
-  - [ ] Filter BEFORE map (reduce iterations: 1000→800 is better than map 1000 then filter)
-  - [ ] Build lookup maps BEFORE joins (O(1) access vs O(n) for .find())
-  - [ ] Validate BEFORE write (don't write invalid data)
-  - [ ] No circular dependencies (A needs B, B needs A)
-
-  Optimal pattern: FETCH → VALIDATE → FILTER → MAP/JOIN → AGGREGATE → VALIDATE → WRITE
-
-  Example catches:
-  - ❌ Map 1000 items, then filter → ✓ Filter to 800, then map 800
-  - ❌ Use .find() in map (O(n²)) → ✓ Build Map first, then O(1) lookups
-  - ❌ Write, then validate → ✓ Validate, then write
-
-  ### 5. Variable Relationship Mapping
-
-  **Question:** Will all variables be declared before use? Proper scope? No collisions?
-
-  For EACH variable in plan:
-  - [ ] Declared (with const/let) before first use
-  - [ ] Type matches expected use (Array vs Object vs primitive)
-  - [ ] Scope appropriate (const at block level, not redeclared)
-  - [ ] No name collisions (same name reused for different data)
-  - [ ] All consumers come AFTER producer
-
-  Example mapping check:
-  \`\`\`
-  ✓ apiData declared (const apiData = ...) before filtered uses it
-  ✓ filtered declared (const filtered = apiData.filter()) before enriched uses it
-  ✓ custMap declared (const custMap = Object.fromEntries()) before enriched uses it
-  ✓ enriched declared (const enriched = filtered.map()) before summary uses it
-  ✗ ISSUE: totalRevenue used in email but declared after email constructed
-  ✗ ISSUE: Variable 'data' reused at line 15 (API response) and line 42 (page data)
-  \`\`\`
-
-  ### 6. Result Schema Validation Pattern
-
-  **Question:** Does the plan validate ALL API/data source response schemas?
-
-  Check:
-  - [ ] Schema expectations documented (expected fields, types, array vs object)
-  - [ ] Validation happens AFTER each fetch/parse operation
-  - [ ] Error handling for schema mismatches
-  - [ ] Expected fields listed and verified (id, status, items, etc.)
-  - [ ] Array lengths, null values, required fields checked
-
-  Example checks:
-  - Does plan validate JSON structure after parse?
-  - Are expected response fields documented? (e.g., {items: [], hasMore: boolean, total: number})
-  - Is there validation: if (!Array.isArray(data.items)) throw?
-  - Are required fields checked: data.every(item => item.id && item.status)?
-  - What happens if schema is unexpected? (throw with helpful message)
-
-  Example catches:
-  - ❌ No validation after JSON.parse() → ✓ Validate structure immediately
-  - ❌ Assumes field exists: data.items.map() → ✓ Check first: if (!data.items) throw
-  - ❌ Silent fail on unexpected schema → ✓ Explicit error: "Expected {items:[], hasMore:boolean}, got {data:[]}" 
-
-  ### 7. Operation Completeness Check
-
-  **Question:** Does the plan cover ALL user requirements end-to-end?
-
-  Check:
-  - [ ] Every user requirement maps to specific operations in plan
-  - [ ] No missing steps (e.g., user asked for email but plan has no GmailApp call)
-  - [ ] Complete workflow from input to output
-  - [ ] Edge cases handled (empty results, partial data, errors)
-  - [ ] All mentioned operations actually implemented
-
-  Example checks:
-  - Does the plan address the COMPLETE user request?
-  - Are there operations in the intention but missing from steps?
-  - Does plan handle: zero results? partial results? full results?
-  - If user said "email me results", is there GmailApp.sendEmail()?
-  - If user said "save to new sheet", is there sheet creation + write?
-
-  Example catches:
-  - ❌ User: "analyze and email" → Plan: only analyzes, no email → ✓ Add email step
-  - ❌ User: "merge 3 sheets" → Plan: only merges 2 → ✓ Add third sheet join
-  - ❌ Plan mentions "backup existing" but no backup code → ✓ Add sh.copyTo() step
-  - ❌ No handling for empty API response → ✓ Add: if (!data.length) return {error: 'No data'}
-
-  **Comprehensive Verification:**
-
-  Key: Headers bold/colored? autoResize? setNumberFormat? setFrozenRows? Multi-service leveraged? Email/backup/schedule included? Looks professional?
-
-  Anti: Raw data dump? Plain text? No formatting? Single-service only? No email when expected? Bare-minimum? Amateur output?
-
-  Fail if anti-questions answer YES.
-
-  ### 8. Logging Strategy Verification
-
-  **Question:** Does the plan include proper log() statements with intention announcements?
-
-  Check:
-  - [ ] Plan includes log() at start of major operations (intention)
-  - [ ] Plan includes log() after operations (results with counts/metrics)
-  - [ ] Tags used: [FETCH], [READ], [FILTER], [JOIN], [CALC], [WRITE], [RESULT], [COMPLETE], [ERROR]
-  - [ ] Logging is strategic (not inside tight loops)
-  - [ ] Respects ~100KB buffer limit (selective logging)
-
-  Example checks:
-  - Does plan show log() before each major operation stating intention?
-  - Does plan show log() after operations with results?
-  - Are tags consistent: [FETCH] for fetches, [RESULT] for outcomes, [COMPLETE] for finish?
-  - Is logging concise (no logging in loops over 1000+ iterations)?
-  - Do log statements include useful context (counts, IDs, status)?
-
-  Example catches:
-  - ❌ No log() statements in plan → ✓ Add log() at each major step
-  - ❌ log() inside map/filter loop → ✓ Move to before/after loop with summary
-  - ❌ Generic log('done') → ✓ Use descriptive tags and metrics
-  - ❌ Missing intention logs before operations → ✓ Add intention statements
-
-  ### 9. Variable Name Tracing & Function Call Intent Verification
-
-  **Question:** Do variables passed to function calls match the INTENDED purpose?
-
-  Trace each variable lifecycle: creation → transformation → usage in function calls
-
-  Check:
-  - [ ] Variables used in function calls contain the data the function expects
-  - [ ] No semantic mismatches (passing customerData where productData expected)
-  - [ ] Variable names accurately reflect contents at each transformation stage
-  - [ ] Function calls use the RIGHT variables to achieve stated intent
-  - [ ] Transformations tracked: apiData → filtered → enriched (using enriched not apiData)
-
-  Example trace:
-  \`\`\`
-  Intent: "Write enriched order data with customer names to sheet"
-  Variable trace:
-  1. apiData = fetch() → raw orders from API
-  2. filtered = apiData.filter() → orders matching criteria  
-  3. enriched = filtered.map() + custMap → orders WITH customer names
-  4. setValues(enriched) → ✓ CORRECT: enriched has customer names
-
-  WRONG would be:
-  4. setValues(filtered) → ✗ filtered missing customer names, doesn't match intent
-  \`\`\`
-
-  Example checks:
-  - When calling setValues(data), does data contain intended values?
-  - When calling sendEmail({to: recipient, body: message}), does message contain intended content?
-  - If intent is "write customer names", does the variable passed have customer names?
-  - Are variables correctly chained through transformations?
-
-  Example catches:
-  - ❌ Intent: write enriched, Code: setValues(filtered) → ✓ Use enriched not filtered
-  - ❌ Passing custSheet where prodSheet needed → ✓ Fix variable reference
-  - ❌ Variable reuse: data for API response AND page data → ✓ Rename to apiData and pageData
-  - ❌ Using wrong map: custMap[productId] → ✓ Should be prodMap[productId]
-
-  ### 10. URL Fetching Pattern Check
-
-  **Question:** When fetching multiple URLs, is the 3-phase fetchAll pattern used?
-
-  **MANDATORY for 2+ URLs:**
-
-  **Phase 1: BUILD all URLs first** (no network calls)
-  \`\`\`javascript
-  const urls = items.map(item => \`\${baseUrl}/\${item.id}\`);
-  \`\`\`
-
-  **Phase 2: FETCH with repeated fetchAll in batches**
-  \`\`\`javascript
-  for (let i = 0; i < urls.length; i += BATCH_SIZE) {
-    const batch = urls.slice(i, i + BATCH_SIZE);
-    const responses = UrlFetchApp.fetchAll(batch.map(url => ({url, muteHttpExceptions: true})));
-    allResponses.push(...responses);
-    if (i + BATCH_SIZE < urls.length) Utilities.sleep(500);
-  }
-  \`\`\`
-
-  **Phase 3: PROCESS all results together** (after ALL fetching complete)
-  \`\`\`javascript
-  const results = allResponses.map(r => JSON.parse(r.getContentText()));
-  \`\`\`
-
-  **NEVER:**
-  - ❌ \`fetch()\` inside a loop (loses batching benefit)
-  - ❌ Build URL and fetch in same iteration
-  - ❌ Process response before all fetches complete
-
-  **If any URLs are fetched individually in a loop:** FAIL - refactor to fetchAll
-
-  ### Quality Review Output Format:
+  ## PHASE 3: QUALITY REVIEW (Prompt-as-Code)
 
   \`\`\`
-  === PLAN QUALITY REVIEW ===
+  QUALITY_CHECK(plan):
+    iteration = 0
+    MAX_ITERATIONS = 3
 
-  SYNTAX VALIDITY:
-  ✓ All GAS methods exist and spelled correctly
-  ✓ getSheetByName (not getSheetById)
-  ✓ setValues for arrays (not setValue)
-  ✓ getRange(row, col, numRows, numCols) - correct signature
+    WHILE iteration < MAX_ITERATIONS:
+      failures = []
 
-  URL/ENDPOINT:
-  ✓ URL complete: https://api.example.com/orders
-  ✓ Params encoded: encodeURIComponent(minDate)
-  ✓ Auth header: Authorization: Bearer \${token}
-  ✓ Method: GET (appropriate for data retrieval)
+      FOR check IN CHECKS:
+        result = EVALUATE(check, plan)
+        IF result.failed: failures.push({check: check.name, reason: result.reason})
 
-  TOOL ARGUMENTS:
-  ✓ getRange(2, 1, enriched.length, 8) - correct signature
-  ✓ setValues(2D array) - will pass [[],[],...] 
-  ✓ formatDate(date, tz, 'yyyyMMdd_HHmmss') - correct order
-  ✗ ISSUE: Planned sheet.appendRow() but appendRow is Sheet method, not Range
+      IF failures.length == 0:
+        RETURN {status: "PASS", score: "10/10"}
+      ELSE:
+        REVISE plan FOR EACH failure
+        iteration += 1
 
-  LOGIC FLOW:
-  ✓ Sequence optimal: Fetch → Validate → Filter → Map → Join → Write
-  ✓ Filter before map (reduces from 1000 to 800 iterations)
-  ✓ Build custMap/prodMap before join (O(1) lookups)
-  ✓ No circular dependencies
-  ✗ ISSUE: Writing enriched before final validation - should validate first
+    IF iteration >= MAX_ITERATIONS:
+      SURFACE failures to user for clarification
+      HALT
 
-  VARIABLE RELATIONSHIPS:
-  ✓ apiData declared before filtered uses it
-  ✓ filtered declared before enriched uses it  
-  ✓ custMap, prodMap declared before enriched uses them
-  ✓ enriched declared before summary uses it
-  ✗ ISSUE: totalRevenue calculated after email body constructed (line order)
-  ✗ ISSUE: Variable 'data' reused for API response (line 15) and page data (line 42)
-
-  RESULT SCHEMA VALIDATION:
-  ✓ JSON structure validated after parse
-  ✓ Expected fields documented: {items: [], hasMore: boolean, total: number}
-  ✓ Array checks: if (!Array.isArray(data.items)) throw
-  ✓ Required field checks: data.items.every(item => item.id && item.status)
-  ✗ ISSUE: No validation for unexpected schema structure
-
-  OPERATION COMPLETENESS:
-  ✓ All user requirements mapped to operations
-  ✓ User requested email - GmailApp.sendEmail() present
-  ✓ Handles zero results, partial results, full results
-  ✓ No missing steps between intention and implementation
-
-  LOGGING STRATEGY:
-  ✓ log() statements at start of major operations (intention)
-  ✓ log() statements after operations (results with metrics)
-  ✓ Tags used: [FETCH], [RESULT], [COMPLETE]
-  ✓ No logging inside loops
-  ✓ Strategic and concise
-
-  VARIABLE INTENT TRACING:
-  ✓ setValues(enriched) - enriched contains customer names as intended
-  ✓ sendEmail({body: emailBody}) - emailBody constructed before use
-  ✓ No semantic mismatches in function calls
-  ✓ Variable transformations tracked correctly
-  ✗ ISSUE: Using filtered where enriched needed (missing customer names)
-
-  COMPREHENSIVE:
-  ✓ Key YES: headers/resize/formats/frozen/multi-service/email/backup/polish | Anti NO: raw/plain/single/minimal
-  ✗ FAIL: Anti YES: no formats, no email, plain numbers, bare-minimum
-
-  === COMPLETENESS SCORE: 7/10 (FAIL) ===
-
-  ISSUES TO FIX BEFORE CODING:
-  1. Change appendRow() plan - use Sheet.appendRow(), not Range.appendRow()
-  2. Move enriched validation before write operation
-  3. Calculate totalRevenue before constructing email body (move calculation up)
-  4. Rename second 'data' to 'pageData' to avoid variable name collision
-
-  After fixes: Revise plan and re-run quality review.
+  CHECKS = [
+    {
+      name: "syntax",
+      question: "All GAS methods exist and spelled correctly?",
+      fail_examples: ["getSheetById", "getRng", "setValue for arrays", "getSheet()", "Range.appendRow"],
+      correct: ["getSheetByName", "getRange", "setValues([[]])", "getSheets()[i]", "Sheet.appendRow"]
+    },
+    {
+      name: "urls",
+      question: "URLs well-formed with encoded params?",
+      fail_if: "raw param in URL without encodeURIComponent",
+      check: ["https:// present", "encodeURIComponent(param)", "Bearer + space + token", "GET for reads"]
+    },
+    {
+      name: "args",
+      question: "GAS methods have correct argument types/order?",
+      critical_signatures: {
+        "getRange": "(row:number, col:number, numRows:number, numCols:number)",
+        "setValues": "(values:any[][])",
+        "formatDate": "(date:Date, timeZone:string, format:string)",
+        "fetch": "(url:string, params?:object)"
+      },
+      fail_examples: ["getRange('A1:B10')", "setValues([1,2,3])", "formatDate('fmt',tz,date)"]
+    },
+    {
+      name: "flow",
+      question: "Operations in optimal order?",
+      required_order: "FETCH → VALIDATE → FILTER → MAP/JOIN → AGGREGATE → VALIDATE → WRITE",
+      fail_if: ["map before filter", ".find() in map (O(n²))", "write before validate", "circular dependency"]
+    },
+    {
+      name: "vars",
+      question: "Variables declared before use, no collisions?",
+      check: ["const/let before use", "type matches usage", "no name reuse for different data", "consumers after producer"]
+    },
+    {
+      name: "schema",
+      question: "API/data responses validated after parse?",
+      required: ["JSON structure validated", "Array.isArray check", "required fields verified", "error on unexpected schema"]
+    },
+    {
+      name: "complete",
+      question: "All user requirements mapped to operations?",
+      fail_if: ["user said 'email' but no GmailApp", "user said 'backup' but no copyTo", "missing edge case handling"]
+    },
+    {
+      name: "logging",
+      question: "thinking() at major phases?",
+      required: ["before major ops (intention)", "after ops (results with counts)", "not inside tight loops"],
+      fail_if: "no progress reporting"
+    },
+    {
+      name: "intent",
+      question: "Variables passed to functions match intended purpose?",
+      trace: "apiData → filtered → enriched → setValues(enriched)",
+      fail_if: "setValues(filtered) when intent is enriched data"
+    },
+    {
+      name: "fetchall",
+      question: "Multiple URLs use 3-phase fetchAll pattern?",
+      pattern: "BUILD urls[] → FETCH with fetchAll in batches → PROCESS after all complete",
+      fail_if: "fetch() inside loop"
+    }
+  ]
   \`\`\`
 
-  ### Quality Gate Decision Point - AUTO-REVISION LOOP
+  **Output format:** Show each check with ✓/✗, list failures, calculate score X/10. If <10, revise plan and re-check.
 
-  Run all 10 quality checks. Calculate COMPLETENESS SCORE.
+  # --- GATE: COMPLEXITY (Pseudocode) ---
 
-  **If COMPLETENESS SCORE = 10/10:** ✓ PROCEED to Phase 4 (Build Code)
-
-  **If any check FAILS:** ✗ ENTER REVISION LOOP
-
-  REVISION LOOP (automatic):
-  1. Identify which checks failed and why
-  2. Revise the plan in PHASE 2 to fix the specific failures
-  3. Return to PHASE 3 and re-run ALL 9 quality checks
-  4. Calculate new COMPLETENESS SCORE
-  5. If SCORE = 10/10, EXIT loop and PROCEED to Phase 4
-  6. If any check still FAILS, REPEAT from step 1
-
-  **Maximum iterations:** 3 revision loops
-  - After 3 failed attempts, surface the issues to user for clarification
-
-  **NEVER proceed to Phase 4 (Build Code) with a failing quality gate.**
-  **ALWAYS fix the PLAN through revision, then re-check.**
-
-  This is a HARD GATE with automatic self-correction that catches bugs in the PLANNING stage, before writing any code.
-
-  # --- GATE: COMPLEXITY (Slow Path Only) ---
-
-  **After planning, score the PLAN:**
-
-  | Factor | Low (0) | Med (1) | High (2+) |
-  |--------|---------|---------|----------|
-  | Steps | 1-3 | 4-7 | 8+ (3pts) |
-  | Data sources | 1 | 2-3 | 4+ |
-  | External APIs | 0-1 | 2+ | Paginated (2pts) |
-  | Outputs | 1 | 2 | 3+ |
-  | Overwrites existing data | No | - | Yes (2pts) |
-
-  **RESULT:**
-  - 0-2 pts: SIMPLE → Proceed
-  - 3-5 pts: MODERATE → Brief summary, proceed
-  - 6+ pts: ELABORATE → ⛔ **CONFIRM BEFORE EXECUTE**
-
-  **If ELABORATE:**
   \`\`\`
-  📋 PLAN SUMMARY
+  COMPLEXITY_GATE(plan):
+    score = 0
+    IF plan.steps > 7: score += 3
+    ELIF plan.steps > 3: score += 1
+    
+    IF plan.data_sources > 3: score += 2
+    ELIF plan.data_sources > 1: score += 1
+    
+    IF plan.has_pagination: score += 2
+    ELIF plan.external_apis > 1: score += 1
+    
+    IF plan.outputs > 2: score += 2
+    ELIF plan.outputs > 1: score += 1
+    
+    IF plan.overwrites_existing_data: score += 2
 
-  INTENTION: [one sentence]
-  STEPS: [numbered list]
-  RISK: [what could go wrong]
-
-  Proceed? (yes/no)
+    IF score >= 6:
+      SHOW_PLAN_SUMMARY(plan.intention, plan.steps, plan.risks)
+      AWAIT user_confirmation("yes")
+      // Covers BOTH plan approval AND data modification consent
+    ELIF score >= 3:
+      SHOW_BRIEF_SUMMARY(plan)
+      PROCEED
+    ELSE:
+      PROCEED
   \`\`\`
-
-  **Wait for affirmative before continuing.**
-
-  When ELABORATE is confirmed, it covers BOTH plan approval AND data modification consent.
 
   ## PHASE 4: BUILD CODE (After Plan Approved)
 
@@ -972,30 +753,40 @@ function _main(
   4. Logging present? (Intention + results)
   5. Confidence? HIGH/MEDIUM/LOW
 
-  # --- GATE: DATA MODIFICATION (FAST PATH + After Verify) ---
+  # --- GATE: DATA MODIFICATION (Pseudocode) ---
 
-  **Operations by Risk Level:**
-  | Risk | Operations | Confirm? |
-  |------|------------|----------|
-  | CRITICAL | deleteSheet, setTrashed(file) | ALWAYS |
-  | HIGH | clear, deleteRow/Column | Unless user said "clear"/"delete" |
-  | MEDIUM | setValues on non-empty | Unless user said "replace"/"overwrite" |
+  \`\`\`
+  DATA_MODIFICATION_GATE(operation, target, user_message):
+    // Step 1: Determine risk level
+    risk = CLASSIFY_RISK(operation)
+    // CRITICAL: deleteSheet, setTrashed(file)
+    // HIGH: clear, deleteRow/Column
+    // MEDIUM: setValues on non-empty
 
-  **Step 1: Check target data first**
-  For Sheets operations:
-  \`\`\`javascript
-  const vals = targetRange.getValues();
-  const nonEmpty = vals.reduce((cnt, row) => cnt + row.filter(cell => cell != null && cell !== '').length, 0);
-  if (nonEmpty > 0) return {willOverwrite: true, nonEmptyCells: nonEmpty, totalCells: vals.length * vals[0].length, range: targetRange.getA1Notation()};
+    // Step 2: Check target data
+    IF target.type == "sheet_range":
+      nonEmpty = COUNT_NON_EMPTY_CELLS(target)
+      IF nonEmpty == 0: PROCEED  // Empty target, no risk
+
+    // Step 3: Check semantic intent from user message
+    explicit_destructive = user_message MATCHES ("replace"|"overwrite"|"clear"|"delete"|"remove")
+
+    // Step 4: Decision logic
+    IF risk == "CRITICAL":
+      CONFIRM_ALWAYS(operation, target)  // No exceptions
+    ELIF risk == "HIGH" AND NOT user_message MATCHES ("clear"|"delete"):
+      CONFIRM(operation, target)
+    ELIF risk == "MEDIUM" AND NOT user_message MATCHES ("replace"|"overwrite"):
+      CONFIRM(operation, target)
+    ELSE:
+      PROCEED  // Explicit intent matches risk level
+
+  EMAIL_GATE(recipients, subject):
+    SHOW "📧 Sending to: {recipients} ({count})\nSubject: {subject}"
+    AWAIT user_confirmation("yes")
   \`\`\`
 
-  **Step 2: Check semantic intent (if non-empty)**
-  - User said "replace", "overwrite", "update" → Explicit intent, skip confirmation for MEDIUM
-  - User said "clear", "delete", "remove" → Explicit intent, skip confirmation for HIGH
-  - User said "put", "add", "write" without explicit replace → Ambiguous, CONFIRM
-  - CRITICAL operations → ALWAYS confirm regardless of intent
-
-  **Step 3: If confirmation needed:**
+  **Confirm message format:**
   \`\`\`
   ⚠️ This will [OPERATION] [DETAILS]
   Data at risk: [COUNT/DESCRIPTION]
@@ -1003,16 +794,6 @@ function _main(
   \`\`\`
 
   **Accept:** "yes", "proceed", "confirm", "go ahead"
-  **Reject + re-prompt:** Ambiguous responses → "Please confirm with 'yes' or 'no'."
-
-  For Drive/Docs/Calendar/Gmail: return description of what will be modified/deleted.
-
-  **EMAIL SEND GATE:** Before sendEmail(), confirm:
-  \`\`\`
-  📧 Sending to: [RECIPIENTS] ([COUNT])
-  Subject: "[SUBJECT]"
-  Proceed? (yes/no)
-  \`\`\`
 
   ## PHASE 6: EXECUTE & REFLECT
 
