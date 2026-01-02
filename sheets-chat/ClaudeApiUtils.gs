@@ -28,7 +28,7 @@ function _main(
   const API_CONFIG = {
     baseUrl: 'https://api.anthropic.com/v1/messages',
     anthropicVersion: '2023-06-01',
-    defaultModel: 'claude-haiku-4-5-20241022',
+    defaultModel: 'claude-haiku-4-5-20251001',
     defaultMaxTokens: 1024,
 
     // Retry configuration for Claude API
@@ -66,7 +66,7 @@ function _main(
    * timeouts but uses UrlFetchUtils retry logic to handle transient failures.
    *
    * @param {Object} options - API call options
-   * @param {string} options.model - Model to use (default: claude-haiku-4-5-20241022)
+   * @param {string} options.model - Model to use (default: claude-haiku-4-5-20251001)
    * @param {Array} options.messages - Array of message objects
    * @param {number} options.maxTokens - Maximum tokens to generate (default: 1024)
    * @param {string} options.system - Optional system prompt

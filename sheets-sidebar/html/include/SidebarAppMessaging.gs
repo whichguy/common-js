@@ -873,7 +873,7 @@
           $modelGroup.html(
             '<label for="modelNameInput">' +
               'Model Name' +
-              '<span class="field-help">Default: claude-haiku-4-5</span>' +
+              '<span class="field-help">Default: claude-haiku-4-5-20251001</span>' +
             '</label>' +
             '<select id="modelNameInput">' +
               '<option value="claude-sonnet-4-latest">Claude Sonnet 4 (Recommended)</option>' +
@@ -883,7 +883,7 @@
           );
           
           // Set current model selection
-          $modelGroup.find('#modelNameInput').val(config.modelName || 'claude-haiku-4-5');
+          $modelGroup.find('#modelNameInput').val(config.modelName || 'claude-haiku-4-5-20251001');
           
           // Journal settings section
           var $journalSection = $('<div class="settings-section"></div>');
