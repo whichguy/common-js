@@ -1134,7 +1134,7 @@
             throw new Error('Failed to load configuration');
           }
           
-          var config = configResult.data.config;
+          var config = configResult.config;
           
           // Create dialog
           var $dialog = $('<div class="settings-dialog"></div>');
@@ -1321,7 +1321,17 @@
             )
               .then(function(saveResult) {
                 if (saveResult && saveResult.success) {
-                  showToast('Settings saved successfully!', 'success');
+                  // Build descriptive toast message
+                  var savedItems = [];
+                  if (apiKey) savedItems.push('API key');
+                  if (modelName) savedItems.push('model');
+                  if (inputFontSize !== originalInputFontSize || messageFontSize !== originalMessageFontSize) {
+                    savedItems.push('font sizes');
+                  }
+                  var toastMsg = savedItems.length > 0 
+                    ? 'Saved: ' + savedItems.join(', ')
+                    : 'Settings saved successfully!';
+                  showToast(toastMsg, 'success');
                   $dialog.remove();
                   $overlay.remove();
                 } else {
