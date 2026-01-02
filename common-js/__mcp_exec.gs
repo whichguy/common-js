@@ -450,7 +450,7 @@ function htmlAuthSuccessResponse(executionResult) {
       '    .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 20px; border-radius: 4px; }\n' +
       '    .success { color: #198754; font-size: 18px; margin-bottom: 20px; }\n' +
       '    .error { color: #dc3545; margin: 15px 0; }\n' +
-      '    .info { background: #f8f9fa; padding: 15px; border-radius: 4px; margin: 15px 0; }\n' +
+      '    .info { background: var(--color-bg-light); padding: 15px; border-radius: 4px; margin: 15px 0; }\n' +
       '    code { background: #e9ecef; padding: 2px 6px; border-radius: 3px; font-family: monospace; }\n' +
       '    ul { line-height: 1.8; }\n' +
       '  </style>\n' +
@@ -1015,7 +1015,7 @@ function htmlAuthErrorResponse(errorData) {
       '    .error-box { background: #f8d7da; border-left: 4px solid #dc3545; padding: 20px; border-radius: 4px; margin-bottom: 20px; }\n' +
       '    .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 20px; border-radius: 4px; }\n' +
       '    .error-title { color: #dc3545; font-size: 18px; margin-bottom: 20px; }\n' +
-      '    .info { background: #f8f9fa; padding: 15px; border-radius: 4px; margin: 15px 0; }\n' +
+      '    .info { background: var(--color-bg-light); padding: 15px; border-radius: 4px; margin: 15px 0; }\n' +
       '    code { background: #e9ecef; padding: 2px 6px; border-radius: 3px; font-family: monospace; }\n' +
       '    pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }\n' +
       '    ul { line-height: 1.8; }\n' +
@@ -1032,7 +1032,7 @@ function htmlAuthErrorResponse(errorData) {
       (errorDetails ? '    <p><strong>Details:</strong> ' + errorDetails + '</p>\n' : '') +
       '  </div>\n' +
       (logger ? '  <details>\n' +
-        '    <summary style="cursor: pointer; padding: 10px; background: #f8f9fa; border-radius: 4px;">Show Logger Output</summary>\n' +
+        '    <summary style="cursor: pointer; padding: 10px; background: var(--color-bg-light); border-radius: 4px;">Show Logger Output</summary>\n' +
         '    <pre>' + logger + '</pre>\n' +
         '  </details>\n' : '') +
       '  \n' +

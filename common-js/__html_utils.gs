@@ -4,7 +4,7 @@ function _main(
   log = globalThis.__getModuleLogFunction?.(module) || (() => {})
 ) {
   /**
-   * common-js/html_utils
+   * common-js/__html_utils
    * HTML Utilities - CommonJS Infrastructure
    * 
    * Server-side HTML templating for Google Apps Script
@@ -451,4 +451,4 @@ function _main(
   };
 }
 
-__defineModule__(_main);
+__defineModule__(_main, true);

@@ -196,6 +196,141 @@
   }
   
   /* ============================================
+     DARK MODE - Automatic (prefers-color-scheme)
+     ============================================ */
+  
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      /* Primary Colors - adjusted for dark mode */
+      --color-primary: #8ab4f8;           /* Lighter blue for dark backgrounds */
+      --color-primary-hover: #aecbfa;     /* Even lighter for hover */
+      --color-primary-light: #669df6;     /* Medium blue accent */
+      --color-primary-bg: #1e3a5f;        /* Dark blue background */
+      --color-primary-border: #3d5a80;    /* Dark blue border */
+      
+      /* Secondary/Accent Colors */
+      --color-purple-start: #9bb1ff;      /* Lighter purple for dark mode */
+      --color-purple-end: #a47bc9;        /* Lighter purple end */
+      --color-gemini-blue: #669df6;       /* Adjusted Gemini blue */
+      
+      /* Status Colors */
+      --color-success: #81c995;           /* Lighter green */
+      --color-success-light: #1e8e3e;     /* Swapped - darker for accents */
+      --color-error: #f28b82;             /* Coral red for dark mode */
+      --color-error-dark: #ee675c;        /* Slightly darker */
+      --color-error-bg: #3c2020;          /* Dark red background */
+      --color-error-border: #5c3030;      /* Dark red border */
+      --color-error-text: #f28b82;        /* Coral red text */
+      --color-error-toast: #ee675c;       /* Error toast accent */
+      --color-warning: #fdd663;           /* Keep warning yellow visible */
+      --color-info: #8ab4f8;              /* Light blue info */
+      
+      /* Neutral Grays - inverted */
+      --color-text-primary: #e8eaed;      /* Light text on dark */
+      --color-text-secondary: #9aa0a6;    /* Medium gray text */
+      --color-text-tertiary: #5f6368;     /* Darker muted text */
+      --color-text-muted: #9aa0a6;        /* Muted text for dark mode */
+      
+      /* Background Colors - dark palette */
+      --color-bg-white: #1e1e1e;          /* Dark background (not pure black) */
+      --color-bg-light: #2d2d2d;          /* Slightly lighter dark */
+      --color-bg-lighter: #333333;        /* Even lighter dark */
+      --color-bg-subtle: #3c4043;         /* Subtle dark background */
+      --color-bg-hover: #3c4043;          /* Hover dark background */
+      
+      /* Border Colors - dark mode */
+      --color-border-light: #3c4043;      /* Light borders on dark */
+      --color-border-medium: #5f6368;     /* Medium borders on dark */
+      --color-border-dark: #9aa0a6;       /* Darker borders on dark */
+      --color-border-input: #5f6368;      /* Input borders */
+      --color-border-focus: #8ab4f8;      /* Focus border - blue */
+      
+      /* Code & Inline Styles - dark mode */
+      --color-code-bg: rgba(255, 255, 255, 0.1);
+      --color-code-text: #f48fb1;         /* Pink for code in dark mode */
+      --color-code-border: rgba(255, 255, 255, 0.15);
+      --color-code-accent: #b39ddb;       /* Light purple accent */
+      
+      /* Shadows - adjusted for dark mode */
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+      --shadow-md: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+      --shadow-lg: 0 2px 6px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+      --shadow-xl: 0 4px 12px rgba(0, 0, 0, 0.5);
+      --shadow-focus: 0 0 0 2px rgba(138, 180, 248, 0.2);
+      --shadow-focus-ring: 0 0 0 3px rgba(138, 180, 248, 0.2), 0 3px 8px rgba(138, 180, 248, 0.25), 0 2px 4px rgba(138, 180, 248, 0.15);
+      --shadow-toast: 0 4px 16px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.4);
+      
+      /* Scrollbar - dark mode */
+      scrollbar-color: var(--color-border-medium) var(--color-bg-subtle);
+    }
+  }
+  
+  /* ============================================
+     DARK MODE - Manual Override [data-theme="dark"]
+     ============================================ */
+  
+  [data-theme="dark"] {
+    /* Primary Colors - adjusted for dark mode */
+    --color-primary: #8ab4f8;
+    --color-primary-hover: #aecbfa;
+    --color-primary-light: #669df6;
+    --color-primary-bg: #1e3a5f;
+    --color-primary-border: #3d5a80;
+    
+    /* Secondary/Accent Colors */
+    --color-purple-start: #9bb1ff;
+    --color-purple-end: #a47bc9;
+    --color-gemini-blue: #669df6;
+    
+    /* Status Colors */
+    --color-success: #81c995;
+    --color-success-light: #1e8e3e;
+    --color-error: #f28b82;
+    --color-error-dark: #ee675c;
+    --color-error-bg: #3c2020;
+    --color-error-border: #5c3030;
+    --color-error-text: #f28b82;
+    --color-error-toast: #ee675c;
+    --color-warning: #fdd663;
+    --color-info: #8ab4f8;
+    
+    /* Neutral Grays - inverted */
+    --color-text-primary: #e8eaed;
+    --color-text-secondary: #9aa0a6;
+    --color-text-tertiary: #5f6368;
+    --color-text-muted: #9aa0a6;
+    
+    /* Background Colors - dark palette */
+    --color-bg-white: #1e1e1e;
+    --color-bg-light: #2d2d2d;
+    --color-bg-lighter: #333333;
+    --color-bg-subtle: #3c4043;
+    --color-bg-hover: #3c4043;
+    
+    /* Border Colors - dark mode */
+    --color-border-light: #3c4043;
+    --color-border-medium: #5f6368;
+    --color-border-dark: #9aa0a6;
+    --color-border-input: #5f6368;
+    --color-border-focus: #8ab4f8;
+    
+    /* Code & Inline Styles - dark mode */
+    --color-code-bg: rgba(255, 255, 255, 0.1);
+    --color-code-text: #f48fb1;
+    --color-code-border: rgba(255, 255, 255, 0.15);
+    --color-code-accent: #b39ddb;
+    
+    /* Shadows - adjusted for dark mode */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 2px 6px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-xl: 0 4px 12px rgba(0, 0, 0, 0.5);
+    --shadow-focus: 0 0 0 2px rgba(138, 180, 248, 0.2);
+    --shadow-focus-ring: 0 0 0 3px rgba(138, 180, 248, 0.2), 0 3px 8px rgba(138, 180, 248, 0.25), 0 2px 4px rgba(138, 180, 248, 0.15);
+    --shadow-toast: 0 4px 16px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.4);
+  }
+  
+  /* ============================================
      FIREFOX SCROLLBAR SUPPORT
      ============================================ */
   
@@ -203,5 +338,70 @@
   * {
     scrollbar-width: thin;
     scrollbar-color: var(--color-border-medium) var(--color-bg-subtle);
+  }
+  
+  /* ============================================
+     SHARED ANIMATIONS - @keyframes
+     Consolidated from multiple CSS files to avoid duplication
+     ============================================ */
+  
+  /* Spin animation - loading spinners */
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  
+  /* Toast notifications - slide in from bottom */
+  @keyframes toastSlideIn {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* Toast notifications - slide out to bottom */
+  @keyframes toastSlideOut {
+    from {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+  }
+  
+  /* Queue chip - enter from right */
+  @keyframes queueChipEnter {
+    from {
+      opacity: 0;
+      transform: translateX(20px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0) scale(1);
+    }
+  }
+  
+  /* Queue chip - exit to right with collapse */
+  @keyframes queueChipExit {
+    from {
+      opacity: 1;
+      transform: translateX(0) scale(1);
+      max-height: 48px;
+      margin-bottom: 8px;
+    }
+    to {
+      opacity: 0;
+      transform: translateX(20px) scale(0.95);
+      max-height: 0;
+      margin-bottom: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+    }
   }
 </style>

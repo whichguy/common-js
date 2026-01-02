@@ -149,10 +149,7 @@
     animation: spin 1s linear infinite;
   }
 
-  @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
+  /* @keyframes spin - moved to SidebarVariables */
 
   /* Smooth collapse transition */
   .message.thinking-message .thinking-content {

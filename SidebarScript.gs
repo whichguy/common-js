@@ -149,6 +149,7 @@ $(() => {
   autoGrowTextarea(); // Set initial height
   populateConversationDropdown(); // Load saved conversations
   loadConfig(); // Load configuration on startup
+  loadTheme(); // Load theme preference (dark mode)
   
   // Load command history from server for persistence across sessions
   window.server.exec_api(null, 'sheets-chat/UISupport', 'loadCommandHistory', [])
@@ -614,7 +615,92 @@ const saveThread = () => {
 // clearChat handler moved to SidebarAppInit (includes server-side API call)
 // See sheets-sidebar/html/include/SidebarAppInit for the implementation
 
-// Config management
+// ============================================
+// Theme Management (Dark Mode)
+// ============================================
+
+/**
+ * Load theme preference from ConfigManager on sidebar init
+ * Uses userDoc scope so theme is per-document per-user
+ */
+const loadTheme = async () => {
+  try {
+    const result = await window.server.exec_api(
+      null,
+      'common-js/ConfigManager',
+      'get',
+      ['SIDEBAR_THEME', 'auto', { scope: 'userDoc' }]
+    );
+    
+    const theme = result?.value || result || 'auto';
+    
+    if (theme !== 'auto') {
+      document.documentElement.setAttribute('data-theme', theme);
+    } else {
+      // Remove attribute to let system preference take over
+      document.documentElement.removeAttribute('data-theme');
+    }
+    
+    console.log('[Theme] Loaded theme preference:', theme);
+  } catch (e) {
+    console.warn('[Theme] Failed to load theme preference:', e);
+    // Default to system preference (no data-theme attribute)
+  }
+};
+
+/**
+ * Toggle theme and persist preference
+ * Cycles through: auto → dark → light → auto
+ */
+const toggleTheme = async () => {
+  const current = document.documentElement.getAttribute('data-theme');
+  let next;
+  
+  // Cycle through: auto → dark → light → auto
+  if (!current || current === 'auto') {
+    next = 'dark';
+  } else if (current === 'dark') {
+    next = 'light';
+  } else {
+    next = 'auto';
+  }
+  
+  // Apply theme immediately
+  if (next === 'auto') {
+    document.documentElement.removeAttribute('data-theme');
+  } else {
+    document.documentElement.setAttribute('data-theme', next);
+  }
+  
+  // Persist to ConfigManager (userDoc scope)
+  try {
+    await window.server.exec_api(
+      null,
+      'common-js/ConfigManager',
+      'set',
+      ['SIDEBAR_THEME', next, { scope: 'userDoc' }]
+    );
+    
+    console.log('[Theme] Saved theme preference:', next);
+    showToast(`Theme: ${next === 'auto' ? 'System' : next.charAt(0).toUpperCase() + next.slice(1)}`, 'info', 2000);
+  } catch (e) {
+    console.error('[Theme] Failed to save theme preference:', e);
+    showToast('Failed to save theme preference', 'error');
+  }
+};
+
+/**
+ * Get current theme state for display
+ * @returns {string} Current theme ('auto', 'dark', or 'light')
+ */
+const getCurrentTheme = () => {
+  return document.documentElement.getAttribute('data-theme') || 'auto';
+};
+
+// ============================================
+// Config Management
+// ============================================
+
 const loadConfig = () => {
   google.script.run
     .withSuccessHandler((response) => {
@@ -1217,11 +1303,13 @@ const createMessageElement = (message) => {
   const $messageDiv = $('<div>')
     .addClass(`message-bubble ${message.role}`);
   
-  // Add role label
-  const $labelDiv = $('<div>')
-    .addClass('message-label')
-    .text(message.role === 'user' ? 'You' : 'AI');
-  $messageDiv.append($labelDiv);
+  // Add role label (only for assistant messages)
+  if (message.role === 'assistant') {
+    const $labelDiv = $('<div>')
+      .addClass('message-label')
+      .text('AI');
+    $messageDiv.append($labelDiv);
+  }
   
   // Process content blocks
   if (Array.isArray(message.content)) {
@@ -1250,11 +1338,13 @@ const renderMessage = (message, $container) => {
   const $messageDiv = $('<div>')
     .addClass(`message-bubble ${message.role}`);
   
-  // Add role label
-  const $labelDiv = $('<div>')
-    .addClass('message-label')
-    .text(message.role === 'user' ? 'You' : 'AI');
-  $messageDiv.append($labelDiv);
+  // Add role label (only for assistant messages)
+  if (message.role === 'assistant') {
+    const $labelDiv = $('<div>')
+      .addClass('message-label')
+      .text('AI');
+    $messageDiv.append($labelDiv);
+  }
   
   // Process content blocks
   if (Array.isArray(message.content)) {

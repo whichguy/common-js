@@ -57,12 +57,13 @@
     integrity="sha256-0kaYYq3qitkkVZpP/6uKTJwfTpqFNM6OHDbsaYzw9Uw="
     crossorigin="anonymous"></script>
   
-  <!-- Template Includes: CSS Split into 3 Logical Files -->
+  <!-- Template Includes: CSS Split into Logical Files -->
   <!-- ⚠️ CSS INCLUDE ORDER - DO NOT CHANGE ⚠️ -->
-  <!-- Core must load first (foundation), then Bubbles, then Input -->
+  <!-- Variables must load first (design tokens), then Core, Bubbles, Input, Styles -->
   <!-- All  include()  scriptlets evaluate server-side and inject inline. -->
   <!-- Note: These are HTML files, NOT CommonJS modules. -->
-  <!-- Cache refresh timestamp: 2025-11-03 15:10 UTC -->
+  <!-- Cache refresh timestamp: 2026-01-02 - Added SidebarVariables -->
+  <?!= include('sheets-sidebar/css/SidebarVariables') ?>
   <?!= include('sheets-sidebar/css/SidebarCore') ?>
   <?!= include('sheets-sidebar/css/SidebarBubbles') ?>
   <?!= include('sheets-sidebar/css/SidebarInput') ?>
