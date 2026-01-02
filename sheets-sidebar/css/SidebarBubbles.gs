@@ -27,10 +27,15 @@
     box-shadow: 0 2px 8px rgba(126, 184, 201, 0.2);
   }
 
+  /* Base message text - configurable font size */
+  .message-text {
+    font-size: var(--font-size-messages, 14px);
+    line-height: 1.5;
+  }
+
   .message.user-message .message-text {
     color: white;
-    font-size: 15px;  /* Larger, more readable font */
-    line-height: 1.5;
+    /* font-size inherited from .message-text */
   }
 
   .message.assistant-message {

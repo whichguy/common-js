@@ -292,6 +292,24 @@
     // Initialize send button state
     updateSendButtonState();
     
+    // Load saved font sizes on startup (non-blocking)
+    window.server.exec_api(null, CONFIG.api.module, 'getConfig')
+      .then(function(result) {
+        if (result && result.success && result.config) {
+          var cfg = result.config;
+          if (cfg.inputFontSize && cfg.inputFontSize !== 11) {
+            document.documentElement.style.setProperty('--font-size-input', cfg.inputFontSize + 'px');
+          }
+          if (cfg.messageFontSize && cfg.messageFontSize !== 14) {
+            document.documentElement.style.setProperty('--font-size-messages', cfg.messageFontSize + 'px');
+          }
+          console.log('[SidebarApp] Font sizes loaded:', cfg.inputFontSize, cfg.messageFontSize);
+        }
+      })
+      .catch(function(err) {
+        console.warn('[SidebarApp] Could not load font settings:', err);
+      });
+    
     // Log initialization complete
     console.log('[SidebarApp] Initialization complete');
     console.log('[SidebarApp] Message history enabled - Use ArrowUp/ArrowDown to navigate (max 100)');

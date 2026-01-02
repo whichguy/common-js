@@ -920,6 +920,10 @@ function getConfig() {
     const journalEnabled = config.get('JOURNAL_ENABLED') === 'true';
     const journalFolderUrl = config.get('JOURNAL_FOLDER_URL') || '';
     
+    // Font size settings (defaults: input=11px, messages=14px)
+    const inputFontSize = parseInt(config.get('INPUT_FONT_SIZE') || '11', 10);
+    const messageFontSize = parseInt(config.get('MESSAGE_FONT_SIZE') || '14', 10);
+    
     return {
       success: true,
       config: {
@@ -927,6 +931,8 @@ function getConfig() {
         modelName: modelName,
         journalEnabled: journalEnabled,
         journalFolderUrl: journalFolderUrl,
+        inputFontSize: inputFontSize,
+        messageFontSize: messageFontSize,
         hasOverride: config.isOverridden('API_KEY'),
         enforcementSource: config.getEnforcementSource('API_KEY')
       }
@@ -946,7 +952,7 @@ function getConfig() {
  */
 function saveConfig(params) {
   try {
-    let { apiKey, modelName, journalEnabled, journalFolderUrl } = params || {};
+    let { apiKey, modelName, journalEnabled, journalFolderUrl, inputFontSize, messageFontSize } = params || {};
     const config = new ConfigManager('CLAUDE_CHAT');
     
     // If apiKey is empty, preserve the existing key
@@ -969,6 +975,14 @@ function saveConfig(params) {
     
     if (journalFolderUrl !== undefined) {
       config.setUser('JOURNAL_FOLDER_URL', journalFolderUrl || '');
+    }
+    
+    // Store font size settings
+    if (inputFontSize !== undefined) {
+      config.setUser('INPUT_FONT_SIZE', String(inputFontSize));
+    }
+    if (messageFontSize !== undefined) {
+      config.setUser('MESSAGE_FONT_SIZE', String(messageFontSize));
     }
     
     return {

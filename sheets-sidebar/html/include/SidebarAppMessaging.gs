@@ -1147,6 +1147,7 @@
           var $closeBtn = $('<button class="close-btn" aria-label="Close dialog"></button>');
           $closeBtn.html('<span class="material-icons">close</span>');
           $closeBtn.on('click', function() {
+            resetFontSizes();  // Reset on close without save
             $dialog.remove();
             $overlay.remove();
           });
@@ -1213,10 +1214,70 @@
           
           $journalSection.append($journalEnabledGroup, $journalFolderGroup);
           
+          // Display settings section
+          var $displaySection = $('<div class="settings-section"></div>');
+          $displaySection.html('<h4>Display Settings</h4>');
+          
+          // Store original font sizes for cancel/reset
+          var originalInputFontSize = config.inputFontSize || 11;
+          var originalMessageFontSize = config.messageFontSize || 14;
+          
+          // Input font size control
+          var $inputFontGroup = $('<div class="form-group font-size-control"></div>');
+          $inputFontGroup.html(
+            '<label>Prompt Input Font Size</label>' +
+            '<div class="font-size-adjuster">' +
+              '<button type="button" class="font-btn" data-target="input" data-action="decrease">−</button>' +
+              '<span class="font-size-value" id="inputFontValue">' + originalInputFontSize + 'px</span>' +
+              '<button type="button" class="font-btn" data-target="input" data-action="increase">+</button>' +
+            '</div>'
+          );
+          
+          // Message font size control
+          var $messageFontGroup = $('<div class="form-group font-size-control"></div>');
+          $messageFontGroup.html(
+            '<label>Chat Messages Font Size</label>' +
+            '<div class="font-size-adjuster">' +
+              '<button type="button" class="font-btn" data-target="messages" data-action="decrease">−</button>' +
+              '<span class="font-size-value" id="messageFontValue">' + originalMessageFontSize + 'px</span>' +
+              '<button type="button" class="font-btn" data-target="messages" data-action="increase">+</button>' +
+            '</div>'
+          );
+          
+          $displaySection.append($inputFontGroup, $messageFontGroup);
+          
           // Save button
           var $saveBtn = $('<button class="primary-btn" id="saveSettingsBtn">Save Settings</button>');
           
-          $content.append($apiKeyGroup, $modelGroup, $journalSection, $saveBtn);
+          $content.append($apiKeyGroup, $modelGroup, $journalSection, $displaySection, $saveBtn);
+          
+          // Font size button handlers - immediate effect via CSS variables
+          $dialog.on('click', '.font-btn', function(e) {
+            e.preventDefault();
+            var $btn = $(this);
+            var target = $btn.data('target');
+            var action = $btn.data('action');
+            var $valueSpan = target === 'input' ? $('#inputFontValue') : $('#messageFontValue');
+            var currentSize = parseInt($valueSpan.text(), 10);
+            
+            // Clamp between 8px and 24px
+            var newSize = action === 'increase'
+              ? Math.min(currentSize + 1, 24)
+              : Math.max(currentSize - 1, 8);
+            
+            // Update display
+            $valueSpan.text(newSize + 'px');
+            
+            // Apply immediately via CSS variable
+            var varName = target === 'input' ? '--font-size-input' : '--font-size-messages';
+            document.documentElement.style.setProperty(varName, newSize + 'px');
+          });
+          
+          // Reset font sizes to original values (called on cancel/close)
+          function resetFontSizes() {
+            document.documentElement.style.setProperty('--font-size-input', originalInputFontSize + 'px');
+            document.documentElement.style.setProperty('--font-size-messages', originalMessageFontSize + 'px');
+          }
           
           // Assemble dialog
           $dialog.append($header, $content);
@@ -1234,6 +1295,10 @@
             var journalEnabled = $('#journalEnabledInput').is(':checked');
             var journalFolderUrl = $('#journalFolderUrl').val().trim();
             
+            // Get font size values
+            var inputFontSize = parseInt($('#inputFontValue').text(), 10);
+            var messageFontSize = parseInt($('#messageFontValue').text(), 10);
+            
             if (!apiKey) {
               showToast('Please enter an API key', 'error');
               return;
@@ -1249,7 +1314,9 @@
                 apiKey: apiKey,
                 modelName: modelName,
                 journalEnabled: journalEnabled,
-                journalFolderUrl: journalFolderUrl || '' // Empty string for default
+                journalFolderUrl: journalFolderUrl || '', // Empty string for default
+                inputFontSize: inputFontSize,
+                messageFontSize: messageFontSize
               }
             )
               .then(function(saveResult) {
@@ -1278,6 +1345,7 @@
           
           // Close on overlay click
           $overlay.on('click', function() {
+            resetFontSizes();  // Reset on cancel
             $dialog.remove();
             $overlay.remove();
           });

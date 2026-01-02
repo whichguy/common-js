@@ -781,4 +781,56 @@ resize: vertical;
       }
     }
 
+    /* ============================================
+       FONT SIZE ADJUSTER CONTROLS
+       For Settings dialog Display Settings section
+       ============================================ */
+
+    .font-size-control {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+    }
+
+    .font-size-adjuster {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .font-btn {
+      width: 28px;
+      height: 28px;
+      border: 1px solid var(--color-border-medium, #dadce0);
+      border-radius: 4px;
+      background: var(--color-bg-white, #ffffff);
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      color: var(--color-text-primary, #202124);
+      padding: 0;
+    }
+
+    .font-btn:hover {
+      background: var(--color-bg-hover, #f1f3f4);
+      border-color: var(--color-primary, #1a73e8);
+    }
+
+    .font-btn:active {
+      transform: scale(0.95);
+    }
+
+    .font-size-value {
+      min-width: 44px;
+      text-align: center;
+      font-weight: 500;
+      font-size: 13px;
+      color: var(--color-text-primary, #202124);
+    }
+
 </style>

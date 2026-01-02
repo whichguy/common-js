@@ -95,7 +95,7 @@ function _main(
     if (!apiKey) {
       try {
         const config = new ConfigManager('CLAUDE_CHAT');
-        apiKey = config.get('ANTHROPIC_API_KEY');
+        apiKey = config.get('API_KEY');
       } catch (e) {
         log(`[ClaudeApiUtils] Failed to get API key from config: ${e.message}`);
       }
@@ -104,7 +104,7 @@ function _main(
     if (!apiKey) {
       return {
         success: false,
-        error: 'No API key available. Set ANTHROPIC_API_KEY in config or pass apiKey option.'
+        error: 'No API key available. Set API_KEY in Settings or pass apiKey option.'
       };
     }
 

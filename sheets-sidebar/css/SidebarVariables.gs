@@ -165,6 +165,13 @@
     --timing-bounce: cubic-bezier(0.34, 1.56, 0.64, 1); /* Bounce effect */
     
     /* ============================================
+       USER-CONFIGURABLE FONT SIZES
+       ============================================ */
+    
+    --font-size-input: 11px;      /* Prompt input textarea */
+    --font-size-messages: 14px;   /* Chat message bubbles (all types) */
+    
+    /* ============================================
        COMPONENT-SPECIFIC VARIABLES
        ============================================ */
     

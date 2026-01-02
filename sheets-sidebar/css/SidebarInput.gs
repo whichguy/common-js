@@ -433,7 +433,7 @@
     background: transparent;
     padding: 8px; /* Clean padding, no left offset needed */
     font-family: inherit;
-    font-size: 11px;
+    font-size: var(--font-size-input, 11px);
     line-height: 24px;
     resize: none;
     min-height: 44px;
