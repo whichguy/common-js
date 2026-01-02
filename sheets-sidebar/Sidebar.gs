@@ -66,6 +66,7 @@
   <?!= include('sheets-sidebar/css/SidebarCore') ?>
   <?!= include('sheets-sidebar/css/SidebarBubbles') ?>
   <?!= include('sheets-sidebar/css/SidebarInput') ?>
+  <?!= include('sheets-sidebar/SidebarStyles') ?>
 </head>
 <body>
   <div class="header">
