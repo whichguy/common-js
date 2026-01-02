@@ -31,6 +31,15 @@
       
       this.thinkingBudget = 128000; // Maximum thinking token budget for extended thinking
       
+      // Models that support extended thinking (dynamically checked)
+      this.thinkingSupportedModels = [
+        'claude-sonnet-4',
+        'claude-opus-4',
+        'claude-3-7-sonnet',
+        'claude-3-5-sonnet'
+        // Haiku models do NOT support thinking
+      ];
+      
       // Auto-instantiate ToolRegistry with all tools enabled
       const ToolRegistry = require('tools/ToolRegistry');
       this._toolRegistry = new ToolRegistry({
@@ -129,6 +138,14 @@
       
       // Use provided model or fall back to constructor's model
       const modelToUse = model || this.model;
+      
+      // Check if model supports thinking (Haiku models don't)
+      const modelSupportsThinking = this._modelSupportsThinking(modelToUse);
+      const useThinking = enableThinking && modelSupportsThinking;
+      
+      if (enableThinking && !modelSupportsThinking) {
+        log(`[ClaudeConversation] Model ${modelToUse} does not support thinking - disabling`);
+      }
 
       // Channel clearing is now handled per-request in sendMessageToClaude()
       // Each request has its own channel (thinking-${requestId})
@@ -210,7 +227,7 @@
       const requestBody = {
         model: modelToUse,
         messages: updatedMessages,
-        max_tokens: enableThinking ? 140000 : 4096,
+        max_tokens: useThinking ? 140000 : 4096,
         tools: toolsToUse
       };
 
@@ -219,8 +236,8 @@
         requestBody.system = systemPrompt;
       }
 
-      // Add extended thinking if enabled
-      if (enableThinking) {
+      // Add extended thinking if enabled AND model supports it
+      if (useThinking) {
         requestBody.thinking = {
           type: 'enabled',
           budget_tokens: this.thinkingBudget
@@ -422,7 +439,7 @@
         });
         
         // Automatically send tool results and get final response
-        return this._sendToolResults(updatedMessages, toolResults, snippet, onThinking, messageSequenceId, systemPrompt, context, toolsToUse, modelToUse);
+        return this._sendToolResults(updatedMessages, toolResults, snippet, onThinking, messageSequenceId, systemPrompt, context, toolsToUse, modelToUse, useThinking);
       }
 
       return {
@@ -457,7 +474,7 @@
      * Internal method - Continue conversation with tool results
      * @private
      */
-    _sendToolResults(messages, toolResults, snippet, onThinking, sequenceId, system, context, toolsToUse, modelToUse) {
+    _sendToolResults(messages, toolResults, snippet, onThinking, sequenceId, system, context, toolsToUse, modelToUse, useThinking = true) {
       // Add tool result message
       const toolResultContent = toolResults.map(result => ({
         type: 'tool_result',
@@ -473,17 +490,21 @@
       snippet.push(toolResultMsg);  // Track tool result message in snippet
 
       // Make direct API call with tool results
-      // max_tokens must be > thinking.budget_tokens (128000)
+      // max_tokens must be > thinking.budget_tokens (128000) when thinking enabled
       const requestBody = {
         model: modelToUse,
         messages: updatedMessages,
-        max_tokens: 140000,
-        tools: toolsToUse,
-        thinking: {
+        max_tokens: useThinking ? 140000 : 4096,
+        tools: toolsToUse
+      };
+      
+      // Add thinking only if model supports it
+      if (useThinking) {
+        requestBody.thinking = {
           type: 'enabled',
           budget_tokens: this.thinkingBudget
-        }
-      };
+        };
+      }
 
       // Add system prompt if provided
       if (system) {
@@ -636,7 +657,7 @@
           };
         });
         
-        return this._sendToolResults(updatedMessages, toolResults2, snippet, onThinking, sequenceId, system, context, toolsToUse, modelToUse);
+        return this._sendToolResults(updatedMessages, toolResults2, snippet, onThinking, sequenceId, system, context, toolsToUse, modelToUse, useThinking);
       }
 
       return {
@@ -654,6 +675,21 @@
         sequenceId: sequenceId,
         context: context
       };
+    }
+
+    /**
+     * Check if a model supports extended thinking
+     * @private
+     * @param {string} model - Model name to check
+     * @returns {boolean} True if model supports thinking
+     */
+    _modelSupportsThinking(model) {
+      if (!model) return false;
+      
+      // Check if model name contains any of the supported model prefixes
+      return this.thinkingSupportedModels.some(supported => 
+        model.includes(supported)
+      );
     }
 
     /**
