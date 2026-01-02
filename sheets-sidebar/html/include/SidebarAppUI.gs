@@ -460,34 +460,7 @@
     // MESSAGE DISPLAY FUNCTIONS
     // ============================================================================
 
-    /**
-     * Show toast notification
-     * @param {string} message - The message to display
-     * @param {string} type - The type of toast ('success', 'error', 'info')
-     * @param {number} duration - How long to show the toast (ms), default 3000
-     */
-    function showToast(message, type, duration) {
-      type = type || 'info';
-      duration = duration || 3000;
-      
-      var $toast = $('<div class="toast"></div>');
-      $toast.addClass('toast-' + type);
-      $toast.text(message);
-      
-      $('body').append($toast);
-      
-      // Trigger reflow to enable animation
-      $toast[0].offsetHeight;
-      
-      $toast.addClass('show');
-      
-      setTimeout(function() {
-        $toast.removeClass('show');
-        setTimeout(function() {
-          $toast.remove();
-        }, 300);
-      }, duration);
-    }
+    // NOTE: showToast is declared in SidebarScript - do not redeclare here
 
     // NOTE: updateThinkingBubble() removed - replaced with simple inline indicator
     // The thinking content is no longer displayed, only a simple dots animation
