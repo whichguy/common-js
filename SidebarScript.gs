@@ -622,8 +622,9 @@ const clearChat = () => {
 const loadConfig = () => {
   google.script.run
     .withSuccessHandler((response) => {
-      if (response && response.success && response.data && response.data.config) {
-        const config = response.data.config;
+      // FIX: getConfig() returns { success: true, config: {...} } without .data wrapper
+      if (response && response.success && response.config) {
+        const config = response.config;
         
         // Set API key (leave empty if none)
         if (config.apiKey) {
@@ -647,17 +648,17 @@ const saveConfig = () => {
   const modelName = $('#modelName').val();
   
   if (!apiKey) {
-    updateStatus('API key required', 'error', 'configStatus');
+    showToast('API key is required', 'error');
     return;
   }
   
-  updateStatus('Saving configuration...', 'sending', 'configStatus');
+  showToast('Saving configuration...', 'info', 2000);
   google.script.run
     .withSuccessHandler(() => {
-      updateStatus('Configuration saved!', 'success', 'configStatus');
+      showToast('Configuration saved!', 'success');
     })
     .withFailureHandler((error) => {
-      updateStatus(`Error: ${error.message}`, 'error', 'configStatus');
+      showToast(`Error: ${error.message || error}`, 'error');
     })
     .exec_api(null, 'sheets-chat/UISupport', 'saveConfig', { apiKey: apiKey, modelName: modelName });
 };
