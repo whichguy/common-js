@@ -253,9 +253,17 @@ function _main(
    * Called from client-side
    */
   function sendMessageToClaude(params) {
+    // DIAGNOSTIC: Log raw params at entry point
+    Logger.log('[DEBUG sendMessageToClaude] params type: ' + typeof params);
+    Logger.log('[DEBUG sendMessageToClaude] params: ' + JSON.stringify(params));
+    Logger.log('[DEBUG sendMessageToClaude] params?.requestId: ' + (params?.requestId));
+    
     try {
       // Extract parameters from params object
       const { messages, text, attachments, enableThinking, requestId } = params || {};
+      
+      // DIAGNOSTIC: Log after destructuring
+      Logger.log('[DEBUG sendMessageToClaude] After destructuring - requestId: ' + requestId);
       
       // Clear only THIS request's channel (not all channels)
       const queue = getThinkingQueue();
@@ -350,14 +358,20 @@ function _main(
    * Messages are automatically managed by QueueManager with Cache backing
    */
   function storeThinkingMessage(thinking, sequenceId, requestId) {
+    // DIAGNOSTIC: Log the requestId being used for channel name
+    Logger.log('[DEBUG storeThinkingMessage] requestId received: ' + requestId);
+    Logger.log('[DEBUG storeThinkingMessage] thinking length: ' + (thinking ? thinking.length : 0));
+    
     // Skip empty or whitespace-only thinking messages
     if (!thinking || !thinking.trim()) {
+      Logger.log('[DEBUG storeThinkingMessage] Skipping empty thinking message');
       return;
     }
     
     try {
       const queue = getThinkingQueue();
       const channelName = `thinking-${requestId}`;
+      Logger.log('[DEBUG storeThinkingMessage] Storing to channel: ' + channelName);
       queue.post(channelName, thinking, {
         sequenceId: sequenceId,
         requestId: requestId,

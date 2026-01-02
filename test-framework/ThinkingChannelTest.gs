@@ -24,4 +24,4 @@ function _main(
   };
 }
 
-__defineModule__(_main, false);
+__defineModule__(_main);

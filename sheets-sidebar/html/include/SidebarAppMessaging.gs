@@ -841,28 +841,46 @@
       
       // Call server-side sendMessageToClaude via exec_api with continuous polling
       // Store the CancellableCall reference for cancel functionality
+      // DEBUG: Log the params object being sent
+      var sendParams = {
+        threadId: currentThreadId,
+        messages: currentMessages,
+        text: messageContent,
+        enableThinking: true,
+        requestId: currentRequestId
+      };
+      console.log('[SendMessage] Calling exec_api with params:', JSON.stringify(sendParams));
+      console.log('[SendMessage] Params.requestId:', sendParams.requestId);
+      
       currentCancellableCall = window.server.exec_api(
         null,
         CONFIG.api.module,
         CONFIG.api.functions.sendMessage,
-        {
-          threadId: currentThreadId,
-          messages: currentMessages,
-          text: messageContent,
-          enableThinking: true,
-          requestId: currentRequestId
-        }
+        sendParams
       );
       
       // Start continuous polling for thinking messages - display in real-time
       // The .poll() method returns a controller when continuous: true
+      console.log('[DEBUG Polling] Starting poll for requestId:', currentRequestId);
+      console.log('[DEBUG Polling] sendParams object:', JSON.stringify(sendParams));
+      
       currentPollingController = currentCancellableCall.poll(
         function(messages) {
+          // DEBUG: Log every poll callback invocation
+          console.log('[DEBUG Polling Callback] messages:', JSON.stringify(messages));
+          console.log('[DEBUG Polling Callback] messages type:', typeof messages);
+          console.log('[DEBUG Polling Callback] messages.length:', messages ? messages.length : 'null/undefined');
+          console.log('[DEBUG Polling Callback] streamContext.isCompleted:', streamContext.isCompleted);
+          
           // Skip if already completed (race condition protection)
-          if (streamContext.isCompleted) return;
+          if (streamContext.isCompleted) {
+            console.log('[DEBUG Polling Callback] Skipping - already completed');
+            return;
+          }
 
           if (messages && messages.length > 0) {
-            console.log('[Polling] Received ' + messages.length + ' thinking messages');
+            console.log('[DEBUG Polling] Received ' + messages.length + ' thinking messages');
+            console.log('[DEBUG Polling] First message:', JSON.stringify(messages[0]));
 
             // Accumulate thinking text from messages
             messages.forEach(function(msg) {

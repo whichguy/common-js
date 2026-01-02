@@ -506,6 +506,11 @@ function createGasServer(config = {}) {
             let isActive = true;
             const pollStartTime = Date.now();
 
+            // DEBUG: Always log poll start to diagnose requestId extraction
+            console.log('[GasServer][poll] Starting poll with args:', JSON.stringify(args));
+            console.log('[GasServer][poll] args[3]:', JSON.stringify(args[3]));
+            console.log('[GasServer][poll] args[3]?.requestId:', args[3]?.requestId);
+
             if (debug) {
               logger.log(`[GasServer][${requestId}] Starting poll with options:`, options);
             }
@@ -515,18 +520,23 @@ function createGasServer(config = {}) {
             const originalRequestId = (function() {
               // Primary: args[3].requestId for exec_api(null, module, func, {requestId, ...})
               if (typeof args[3] === 'object' && args[3]?.requestId) {
+                console.log('[GasServer][poll] Found requestId in args[3]:', args[3].requestId);
                 return args[3].requestId;
               }
               // Fallback: args[0].requestId for direct object param
               if (typeof args[0] === 'object' && args[0]?.requestId) {
+                console.log('[GasServer][poll] Found requestId in args[0]:', args[0].requestId);
                 return args[0].requestId;
               }
               // No requestId found
+              console.warn('[GasServer][poll] No requestId found in args!');
               if (debug) {
                 logger.warn(`[GasServer][${requestId}] No requestId in poll args:`, args);
               }
               return null;
             })();
+            
+            console.log('[GasServer][poll] Extracted originalRequestId:', originalRequestId);
 
             // Polling loop function
             function doPoll() {
@@ -573,6 +583,9 @@ function createGasServer(config = {}) {
                   }
                 })
                 .exec_api(null, pollModule, pollFunction, `thinking-${originalRequestId}`, { maxWaitMs: 5000, checkIntervalMs: checkIntervalMs });
+              
+              // DEBUG: Log the channel being polled
+              console.log('[GasServer][poll] Polling channel: thinking-' + originalRequestId);
             }
 
             // Start first poll after initial delay
