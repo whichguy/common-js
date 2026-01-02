@@ -542,7 +542,7 @@
      * NOTE: Input box stays enabled to allow queuing additional prompts
      */
     function showLoadingState() {
-      isProcessing = true;
+      isMessageProcessing = true;
       // Don't disable send button - allow queuing more prompts
       // Don't disable input - allow typing next prompt
       $('#statusArea').show();
@@ -559,7 +559,7 @@
      * Hide loading state with proper UI updates
      */
     function hideLoadingState() {
-      isProcessing = false;
+      isMessageProcessing = false;
       $('#sendBtn').prop('disabled', false).removeClass('disabled');
       $('#messageInput').prop('disabled', false).focus();
       $('#statusArea').hide();
@@ -730,7 +730,7 @@
       var hasAttachments = currentAttachments.length > 0;
 
       // If already processing, add to queue instead of blocking
-      if (isProcessing) {
+      if (isMessageProcessing) {
         if (!hasMessage && !hasAttachments) {
           showToast('Please enter a message or attach files', 'error');
           return;
@@ -751,7 +751,7 @@
       }
       
       // Set flag IMMEDIATELY after validation
-      isProcessing = true;
+      isMessageProcessing = true;
       
       // Show loading state
       showLoadingState();

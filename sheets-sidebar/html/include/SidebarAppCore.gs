@@ -109,7 +109,7 @@
   // GLOBAL STATE
   // ============================================================================
   var currentThreadId = null;  // Track conversation thread
-  var isProcessing = false;    // Track if message is being processed
+  var isMessageProcessing = false;    // Track if message is being processed
   var currentRequestId = null; // Track current request for thinking polling
   var messageStartTime = null; // Track message send time for stats display
   var timerInterval = null;    // Live timer interval for counting up during message send
