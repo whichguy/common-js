@@ -385,11 +385,11 @@
         }
       }
       
-      /* All Thoughts bubble - Gemini lavender with Material Design 3 elevation */
+      /* All Thoughts bubble - Yellow to match last-thinking-bubble */
       .all-thoughts-bubble {
-        background: #eee8f5;  /* Darker lavender for better visibility */
+        background: #fff9e6;  /* Yellow background matching last-thinking-bubble */
         border: none;  /* Remove border, use elevation instead */
-        border-left: 4px solid #6442d6;  /* Gemini primary accent */
+        border-left: 4px solid #ffd966;  /* Yellow accent matching last-thinking-bubble */
         border-radius: 12px;
         margin-bottom: 10px;
         overflow: hidden;

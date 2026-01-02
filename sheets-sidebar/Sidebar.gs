@@ -169,6 +169,24 @@
             <div class="help-text">Select the Claude model to use for conversations</div>
           </div>
           
+          <h3 style="margin-top: 24px;">Display Settings</h3>
+          <div class="form-group">
+            <label for="inputFontSize">Input Font Size</label>
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <input type="range" id="inputFontSize" min="10" max="18" value="11" style="flex: 1;">
+              <span id="inputFontSizeValue" style="min-width: 40px; text-align: right;">11px</span>
+            </div>
+            <div class="help-text">Font size for the message input textarea</div>
+          </div>
+          <div class="form-group">
+            <label for="messageFontSize">Message Font Size</label>
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <input type="range" id="messageFontSize" min="12" max="20" value="14" style="flex: 1;">
+              <span id="messageFontSizeValue" style="min-width: 40px; text-align: right;">14px</span>
+            </div>
+            <div class="help-text">Font size for chat message bubbles</div>
+          </div>
+          
           <h3 style="margin-top: 24px;">Conversation Journal</h3>
           <div class="form-group">
             <label>

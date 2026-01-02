@@ -139,6 +139,19 @@ const initEventHandlers = () => {
   
   // Save config button
   $('#saveConfigBtn').on('click', saveConfig);
+  
+  // Font size sliders - live preview
+  $('#inputFontSize').on('input', function() {
+    const size = $(this).val();
+    $('#inputFontSizeValue').text(size + 'px');
+    document.documentElement.style.setProperty('--font-size-input', size + 'px');
+  });
+  
+  $('#messageFontSize').on('input', function() {
+    const size = $(this).val();
+    $('#messageFontSizeValue').text(size + 'px');
+    document.documentElement.style.setProperty('--font-size-messages', size + 'px');
+  });
 };
 
 // Initialize after DOM is ready
@@ -712,6 +725,18 @@ const loadConfig = () => {
         if (config.modelName) {
           $('#modelName').val(config.modelName);
         }
+        
+        // Set font sizes and apply to CSS variables
+        const inputFontSize = config.inputFontSize || 11;
+        const messageFontSize = config.messageFontSize || 14;
+        
+        $('#inputFontSize').val(inputFontSize);
+        $('#inputFontSizeValue').text(inputFontSize + 'px');
+        document.documentElement.style.setProperty('--font-size-input', inputFontSize + 'px');
+        
+        $('#messageFontSize').val(messageFontSize);
+        $('#messageFontSizeValue').text(messageFontSize + 'px');
+        document.documentElement.style.setProperty('--font-size-messages', messageFontSize + 'px');
       }
     })
     .withFailureHandler((error) => {
@@ -723,6 +748,8 @@ const loadConfig = () => {
 const saveConfig = () => {
   const apiKey = $('#apiKey').val();
   const modelName = $('#modelName').val();
+  const inputFontSize = parseInt($('#inputFontSize').val(), 10);
+  const messageFontSize = parseInt($('#messageFontSize').val(), 10);
   
   if (!apiKey) {
     showToast('API key is required', 'error');
@@ -737,7 +764,12 @@ const saveConfig = () => {
     .withFailureHandler((error) => {
       showToast(`Error: ${error.message || error}`, 'error');
     })
-    .exec_api(null, 'sheets-chat/UISupport', 'saveConfig', { apiKey: apiKey, modelName: modelName });
+    .exec_api(null, 'sheets-chat/UISupport', 'saveConfig', { 
+      apiKey: apiKey, 
+      modelName: modelName,
+      inputFontSize: inputFontSize,
+      messageFontSize: messageFontSize
+    });
 };
 
 // Keyboard handler with command history navigation
@@ -875,25 +907,46 @@ const handleMessageSent = (response) => {
   if (!response) {
     // Check if thinking messages arrived successfully (indicates server completed work)
     // This can happen when google.script.run times out but server work succeeded
-    const currentRequestMessages = activeRequestId ? 
-      allThinkingMessagesByRequest.get(activeRequestId) || [] : [];
+    // google.script.run has a 30-second timeout, but Claude API calls with extended
+    // thinking can exceed this limit.
+    const currentRequestId = activeRequestId;
+    const currentRequestMessages = currentRequestId ? 
+      allThinkingMessagesByRequest.get(currentRequestId) || [] : [];
     const hasThinkingMessages = currentRequestMessages.length > 0;
     
     // Check if last thinking message indicates completion
+    // Or if we have multiple thinking messages (indicates substantial server processing)
     const lastThinking = hasThinkingMessages ? 
       currentRequestMessages[currentRequestMessages.length - 1] : '';
-    const indicatesCompletion = lastThinking && (
+    
+    // Explicit completion keywords
+    const hasCompletionKeyword = lastThinking && (
       lastThinking.toLowerCase().includes('done') ||
       lastThinking.toLowerCase().includes('complete') ||
       lastThinking.toLowerCase().includes('finished') ||
       lastThinking.toLowerCase().includes('inserted') ||
-      lastThinking.toLowerCase().includes('success')
+      lastThinking.toLowerCase().includes('success') ||
+      lastThinking.toLowerCase().includes('added') ||
+      lastThinking.toLowerCase().includes('created') ||
+      lastThinking.toLowerCase().includes('updated') ||
+      lastThinking.toLowerCase().includes('returned') ||
+      lastThinking.toLowerCase().includes('found') ||
+      lastThinking.toLowerCase().includes('retrieved')
     );
     
-    console.warn('[handleMessageSent] No response received from server', {
+    // Having 2+ thinking messages is a strong indicator that server processing completed
+    // (If it crashed early, we'd typically have 0-1 messages)
+    const hasSubstantialThinking = currentRequestMessages.length >= 2;
+    
+    // Consider it a likely success if we have substantial thinking OR explicit keywords
+    const likelyServerSuccess = hasCompletionKeyword || hasSubstantialThinking;
+    
+    console.warn('[handleMessageSent] No response received from server (likely timeout)', {
       hasThinkingMessages: hasThinkingMessages,
       thinkingCount: currentRequestMessages.length,
-      indicatesCompletion: indicatesCompletion,
+      hasCompletionKeyword: hasCompletionKeyword,
+      hasSubstantialThinking: hasSubstantialThinking,
+      likelyServerSuccess: likelyServerSuccess,
       lastThinkingPreview: lastThinking?.substring(0, 100),
       timestamp: new Date().toISOString()
     });
@@ -910,21 +963,33 @@ const handleMessageSent = (response) => {
       updateStatusTime(elapsed);
     }
     
-    // If thinking messages indicate completion, don't show error
-    // The work was done successfully, just the response didn't arrive
-    if (indicatesCompletion) {
+    // If thinking messages indicate likely completion, don't show error
+    // The work was done successfully, just the response didn't arrive due to timeout
+    if (likelyServerSuccess) {
       console.log('[handleMessageSent] Server work appears complete despite missing response');
-      showToast('Request completed (response timeout)', 'info', 3000);
+      showToast('Request completed (response timeout - refresh to see result)', 'info', 4000);
       
       // Clear processing flag for All Thoughts bubble
-      if (activeRequestId) {
-        const $allThoughts = $(`#allThoughtsBubble-${activeRequestId}`);
+      if (currentRequestId) {
+        const $allThoughts = $(`#allThoughtsBubble-${currentRequestId}`);
+        if ($allThoughts.length) {
+          $allThoughts.removeAttr('data-processing');
+        }
+      }
+    } else if (hasThinkingMessages) {
+      // Has some thinking but not clear completion - might still be processing
+      console.log('[handleMessageSent] Has thinking messages but unclear completion status');
+      showToast('Request may have timed out - check results and retry if needed', 'warning', 5000);
+      
+      // Clear processing flag for All Thoughts bubble
+      if (currentRequestId) {
+        const $allThoughts = $(`#allThoughtsBubble-${currentRequestId}`);
         if ($allThoughts.length) {
           $allThoughts.removeAttr('data-processing');
         }
       }
     } else {
-      // No indication of completion - show error
+      // No thinking messages at all - genuine error
       handleError(new Error('No response received from server'));
     }
     
