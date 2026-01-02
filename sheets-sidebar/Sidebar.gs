@@ -213,7 +213,7 @@
   <!-- The <?!= include('SidebarScript') ?> scriptlet evaluates server-side and injects -->
   <!-- the entire contents of SidebarScript.gs inline at this location. -->
   <!-- Note: SidebarScript.gs is an HTML file, NOT a CommonJS module. -->
-  <?!= include('sheets-sidebar/SidebarScript') ?>
+  <?!= include('SidebarScript') ?>
 
   <!-- Template Include: gas_client -->
   <!-- Promise-based wrapper for google.script.run API -->
