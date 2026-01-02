@@ -163,7 +163,7 @@
             <label for="modelName">Model</label>
             <select id="modelName">
               <option value="claude-sonnet-4-latest" selected>Claude Sonnet 4 (Recommended)</option>
-              <option value="claude-haiku-4-latest">Claude Haiku 4 (Fast)</option>
+              <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Fast)</option>
               <option value="claude-opus-4-latest">Claude Opus 4 (Most Capable)</option>
             </select>
             <div class="help-text">Select the Claude model to use for conversations</div>

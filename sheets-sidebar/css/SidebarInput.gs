@@ -1,9 +1,4 @@
-function _main(
-  module = globalThis.__getCurrentModule(),
-  exports = module.exports,
-  log = globalThis.__getModuleLogFunction?.(module) || (() => {})
-) {
-  <style>
+<style>
     /* ⚠️ WARNING: This file is an HTML include - DO NOT add CommonJS wrapper!
      * This file is included in Sidebar.gs via <?!= include('SidebarInput') ?>
      * Always use raw_write with fileType: "HTML" when editing this file.
@@ -296,9 +291,6 @@ function _main(
 
 
 
-
-
-
     /* Old attachment preview styles removed - using .attachment-chips instead */
 
     .resize-handle {
@@ -332,7 +324,6 @@ function _main(
     /* Old .gemini-input-box textarea removed - replaced by .v2-input-box textarea */
 
     /* Old button row/status classes removed - replaced by v2-* classes */
-
 
 
 
@@ -660,6 +651,3 @@ function _main(
     /* Dark mode styles removed - not currently implemented */
 
   </style>
-}
-
-__defineModule__(_main);

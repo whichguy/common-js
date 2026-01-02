@@ -1,9 +1,4 @@
-function _main(
-  module = globalThis.__getCurrentModule(),
-  exports = module.exports,
-  log = globalThis.__getModuleLogFunction?.(module) || (() => {})
-) {
-  <style>
+<style>
     /* ⚠️ WARNING: This file is an HTML include - DO NOT add CommonJS wrapper!
      * This file is included in Sidebar.gs via <?!= include('SidebarCore') ?>
      * Always use raw_write with fileType: "HTML" when editing this file.
@@ -819,6 +814,3 @@ function _main(
       }
 
   </style>
-}
-
-__defineModule__(_main);

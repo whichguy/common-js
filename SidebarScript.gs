@@ -620,39 +620,37 @@ const saveThread = () => {
 // ============================================
 
 /**
- * Load theme preference from ConfigManager on sidebar init
+ * Load theme preference from UISupport on sidebar init
  * Uses userDoc scope so theme is per-document per-user
+ * Non-blocking: uses callback instead of await for optional feature
  */
-const loadTheme = async () => {
-  try {
-    const result = await window.server.exec_api(
-      null,
-      'common-js/ConfigManager',
-      'get',
-      ['SIDEBAR_THEME', 'auto', { scope: 'userDoc' }]
-    );
-    
-    const theme = result?.value || result || 'auto';
-    
-    if (theme !== 'auto') {
-      document.documentElement.setAttribute('data-theme', theme);
-    } else {
-      // Remove attribute to let system preference take over
-      document.documentElement.removeAttribute('data-theme');
-    }
-    
-    console.log('[Theme] Loaded theme preference:', theme);
-  } catch (e) {
-    console.warn('[Theme] Failed to load theme preference:', e);
-    // Default to system preference (no data-theme attribute)
-  }
+const loadTheme = () => {
+  // Fire-and-forget: theme is optional, don't block initialization
+  window.server.exec_api(null, 'sheets-chat/UISupport', 'getThemePreference', [])
+    .then((result) => {
+      const theme = result?.theme || 'auto';
+      
+      if (theme !== 'auto') {
+        document.documentElement.setAttribute('data-theme', theme);
+      } else {
+        // Remove attribute to let system preference take over
+        document.documentElement.removeAttribute('data-theme');
+      }
+      
+      console.log('[Theme] Loaded theme preference:', theme);
+    })
+    .catch((e) => {
+      console.warn('[Theme] Failed to load theme preference:', e);
+      // Default to system preference (no data-theme attribute)
+    });
 };
 
 /**
  * Toggle theme and persist preference
  * Cycles through: auto → dark → light → auto
+ * Non-blocking: uses callback for persistence
  */
-const toggleTheme = async () => {
+const toggleTheme = () => {
   const current = document.documentElement.getAttribute('data-theme');
   let next;
   
@@ -665,28 +663,25 @@ const toggleTheme = async () => {
     next = 'auto';
   }
   
-  // Apply theme immediately
+  // Apply theme immediately (optimistic update)
   if (next === 'auto') {
     document.documentElement.removeAttribute('data-theme');
   } else {
     document.documentElement.setAttribute('data-theme', next);
   }
   
-  // Persist to ConfigManager (userDoc scope)
-  try {
-    await window.server.exec_api(
-      null,
-      'common-js/ConfigManager',
-      'set',
-      ['SIDEBAR_THEME', next, { scope: 'userDoc' }]
-    );
-    
-    console.log('[Theme] Saved theme preference:', next);
-    showToast(`Theme: ${next === 'auto' ? 'System' : next.charAt(0).toUpperCase() + next.slice(1)}`, 'info', 2000);
-  } catch (e) {
-    console.error('[Theme] Failed to save theme preference:', e);
-    showToast('Failed to save theme preference', 'error');
-  }
+  // Show toast immediately
+  showToast(`Theme: ${next === 'auto' ? 'System' : next.charAt(0).toUpperCase() + next.slice(1)}`, 'info', 2000);
+  
+  // Persist to UISupport (fire-and-forget)
+  window.server.exec_api(null, 'sheets-chat/UISupport', 'setThemePreference', [next])
+    .then(() => {
+      console.log('[Theme] Saved theme preference:', next);
+    })
+    .catch((e) => {
+      console.error('[Theme] Failed to save theme preference:', e);
+      // Don't show error toast - theme still works locally
+    });
 };
 
 /**
