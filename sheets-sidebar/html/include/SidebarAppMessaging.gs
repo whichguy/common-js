@@ -990,10 +990,11 @@
           // Clear current request ID
           currentRequestId = null;
           
-          // Clean up polling controller if it's still the current one
+          // Stop and clean up polling controller if it's still the current one
           if (currentPollingController === controller) {
+            controller.stop();  // Stop the polling loop by setting isActive = false
             currentPollingController = null;
-            console.log('[Polling] Cleaned up controller reference');
+            console.log('[Polling] Stopped and cleaned up controller');
           }
           
           // Process next item in queue if any
