@@ -111,7 +111,7 @@
   var currentThreadId = null;  // Track conversation thread
   var isMessageProcessing = false;    // Track if message is being processed
   var currentRequestId = null; // Track current request for thinking polling
-  var messageStartTime = null; // Track message send time for stats display
+  // NOTE: messageStartTime is declared in SidebarScript - do not redeclare here
   var timerInterval = null;    // Live timer interval for counting up during message send
   var currentMessages = [];    // Track current conversation messages for saving
   var loadedConversationId = null; // Track which conversation is currently loaded
