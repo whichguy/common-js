@@ -281,8 +281,8 @@
     }
 
     .message-bubble.user {
-      background: #d2e3fc;
-      border: 1px solid #aecbfa;
+      background: #bdd4f0;
+      border: 1px solid #8bb5e3;
       border-left: 4px solid #1a73e8;
     }
 
