@@ -521,6 +521,54 @@
     // The thinking content is no longer displayed, only a simple dots animation
 
     /**
+     * Load saved conversations into dropdown
+     * Fetches from Drive via UISupport.listConversations()
+     */
+    function loadConversationDropdown() {
+      console.log('[Conversation] Loading conversation dropdown');
+
+      var $dropdown = $('#conversationSelector');
+      if (!$dropdown.length) {
+        console.warn('[Conversation] Dropdown element not found');
+        return;
+      }
+
+      // Clear existing options except placeholder
+      $dropdown.find('option:not(:first)').remove();
+
+      // Call backend to get conversations
+      window.server.exec_api(null, 'sheets-chat/UISupport', 'listConversations')
+        .then(function(result) {
+          if (!result || !result.success) {
+            console.error('[Conversation] Failed to load conversations:', result && result.error);
+            return;
+          }
+
+          var conversations = (result.data && result.data.conversations) || [];
+          console.log('[Conversation] Loaded ' + conversations.length + ' conversations');
+
+          // Add options for each conversation
+          conversations.forEach(function(conv) {
+            var $option = $('<option></option>');
+            $option.val(conv.id);
+
+            // Format display text: title or date
+            var displayText = conv.title || conv.name || 'Conversation';
+            if (conv.createdAt) {
+              var date = new Date(conv.createdAt);
+              displayText += ' (' + date.toLocaleDateString() + ')';
+            }
+
+            $option.text(displayText);
+            $dropdown.append($option);
+          });
+        })
+        .catch(function(error) {
+          console.error('[Conversation] Error loading conversations:', error);
+        });
+    }
+
+    /**
      * Display usage statistics in status line
      * @param {object} usage - Usage object from API response
      * @param {number} elapsedMs - Time taken for the request
