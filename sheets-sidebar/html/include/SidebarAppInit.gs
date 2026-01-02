@@ -21,6 +21,20 @@
   $(document).ready(function() {
     console.log('[SidebarApp] Document ready, initializing event handlers');
     
+    // Tab switching handler
+    $('.tab').on('click', function() {
+      const tabName = $(this).data('tab');
+      console.log('[SidebarApp] Tab clicked:', tabName);
+      
+      // Update tab buttons
+      $('.tab').removeClass('active').attr('aria-selected', 'false');
+      $(this).addClass('active').attr('aria-selected', 'true');
+      
+      // Update tab content panels
+      $('.tab-content').removeClass('active');
+      $('#' + tabName + 'Tab').addClass('active');
+    });
+    
     // Send button click
     $('#sendBtn').on('click', function() {
       console.log('[SidebarApp] Send button clicked');
