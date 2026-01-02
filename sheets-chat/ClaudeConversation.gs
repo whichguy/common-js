@@ -120,7 +120,7 @@
         system = null,
         context = {},
         attachments = [],
-        maxTokens = 4096,
+        maxTokens,  // Unused - API uses defaults
         enableThinking = true,
         requestId,
         sequenceId,
@@ -206,10 +206,10 @@
         : this._toolRegistry.getEnabledTools();
 
       // Build API request with tools
+      // Do not set max_tokens - let Claude API use its defaults
       const requestBody = {
         model: modelToUse,
         messages: updatedMessages,
-        max_tokens: maxTokens,
         tools: toolsToUse
       };
 
@@ -241,7 +241,7 @@
       // Diagnostic logging for debugging 400 errors
       log('[API_REQUEST] Model: ' + requestBody.model);
       log('[API_REQUEST] Messages count: ' + requestBody.messages.length);
-      log('[API_REQUEST] Max tokens: ' + requestBody.max_tokens);
+      // max_tokens not set - API uses defaults
       log('[API_REQUEST] Tools count: ' + (requestBody.tools ? requestBody.tools.length : 0));
       log('[API_REQUEST] System prompt length: ' + (requestBody.system ? requestBody.system.length : 0) + ' chars');
       log('[API_REQUEST] Has thinking: ' + (requestBody.thinking ? 'yes' : 'no'));
@@ -472,10 +472,10 @@
       snippet.push(toolResultMsg);  // Track tool result message in snippet
 
       // Make direct API call with tool results
+      // Do not set max_tokens - let Claude API use its defaults
       const requestBody = {
         model: modelToUse,
         messages: updatedMessages,
-        max_tokens: 4096,
         tools: toolsToUse,
         thinking: {
           type: 'enabled',
