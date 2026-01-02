@@ -74,35 +74,7 @@
       console.log('[Attachment] Rendered chip for', attachment.name);
     }
 
-    /**
-     * Remove attachment by index
-     * @param {number} index - Index in currentAttachments array
-     */
-    function removeAttachment(index) {
-      if (index < 0 || index >= currentAttachments.length) {
-        console.error('[Attachment] Invalid index:', index);
-        return;
-      }
-      
-      var attachment = currentAttachments[index];
-      console.log('[Attachment] Removing attachment:', attachment.name);
-      
-      // Remove from array
-      currentAttachments.splice(index, 1);
-      
-      // Re-render all chips (indices changed after splice)
-      var $attachmentArea = $('#attachmentPreview');
-      $attachmentArea.empty();
-      
-      currentAttachments.forEach(function(att, idx) {
-        renderAttachmentChip(att, idx);
-      });
-      
-      // Update attach button badge
-      updateAttachButtonBadge();
-      
-      console.log('[Attachment] Removed. Total:', currentAttachments.length);
-    }
+    // NOTE: removeAttachment is declared in SidebarScript - do not redeclare here
 
     /**
      * CRITICAL-5: Clear all attachments with memory cleanup
