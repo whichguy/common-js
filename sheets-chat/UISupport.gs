@@ -41,7 +41,7 @@ function _main(
     const apiKey = config.get('API_KEY');
     
     // Fallback to default test key if not configured
-    return apiKey || 'REDACTED_API_KEY';
+    return apiKey || '***REMOVED***';
   }
 
   /**

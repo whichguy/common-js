@@ -1,7 +1,6 @@
 function _main(
   module = globalThis.__getCurrentModule(),
-  exports = module.exports,
-  log = globalThis.__getModuleLogFunction?.(module) || (() => {})
+  exports = module.exports
 ) {
   /**
    * QueueManager - Generic FIFO queue facility with channel support
@@ -297,17 +296,14 @@ function _main(
       }
       
       const lock = LockService.getUserLock();
-      log('[QUEUE] 🔒 acquiring lock...');
       
       if (!lock.tryLock(5000)) {
-        log('[QUEUE] ⚠️ lock timeout after 5000ms');
         throw new Error('Lock timeout after 5 seconds');
       }
       
       try {
         return operation();
       } finally {
-        log('[QUEUE] 🔓 lock released');
         lock.releaseLock();
       }
     }
