@@ -635,18 +635,9 @@
       });
     }
 
-    /**
-     * Remove item from queue by index
-     * @param {number} index - Index of item to remove
-     */
-    function removeFromQueue(index) {
-      if (index >= 0 && index < promptQueue.length) {
-        var removed = promptQueue.splice(index, 1)[0];
-        console.log('[Queue] Removed item at index', index, ':', removed.text ? removed.text.substring(0, 30) : '[Attachment]');
-        renderQueueUI();
-        showToast('Removed from queue', 'info');
-      }
-    }
+    // NOTE: removeFromQueue is defined in SidebarScript (primary declaration)
+    // Removed duplicate definition to prevent 'Identifier already declared' error
+    // GAS HTML includes share global scope - no isolation between files
 
     /**
      * Add prompt to queue with current message and attachments
