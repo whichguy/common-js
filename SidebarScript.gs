@@ -37,24 +37,44 @@ const hideSpinner = () => {
 };
 
 const updateStatusTime = (elapsed) => {
-  const $timeEl = $('#statusTime');
-  if ($timeEl.length) {
-    $timeEl.text(formatElapsedTime(elapsed));
-  }
+  lastElapsedTime = elapsed;
+  updateCombinedStatus();
 };
 
+// Track last known values for combined display
+let lastElapsedTime = null;
+let lastTokenCount = null;
+
 const updateStatusTokens = (count) => {
-  const $tokensEl = $('#statusTokens');
-  if ($tokensEl.length) {
-    const formatted = formatTokenCount(count);
-    // Add separator bullet if we have content
-    $tokensEl.text(formatted ? ` • ${formatted}` : '');
+  lastTokenCount = count;
+  updateCombinedStatus();
+};
+
+// Update combined status display (time + tokens in #statusText)
+const updateCombinedStatus = () => {
+  const $statusEl = $('#statusText');
+  if (!$statusEl.length) return;
+  
+  const parts = [];
+  
+  // Add elapsed time if available
+  if (lastElapsedTime !== null) {
+    parts.push(formatElapsedTime(lastElapsedTime));
   }
+  
+  // Add token count if available
+  if (lastTokenCount && lastTokenCount > 0) {
+    const formatted = formatTokenCount(lastTokenCount);
+    if (formatted) parts.push(formatted);
+  }
+  
+  $statusEl.text(parts.join(' • ') || 'Processing...');
 };
 
 const clearStatus = () => {
-  updateStatusTime('');
-  updateStatusTokens('');
+  lastElapsedTime = null;
+  lastTokenCount = null;
+  $('#statusText').text('');
   hideSpinner();
 };
 
@@ -94,7 +114,7 @@ const initEventHandlers = () => {
   $('#conversationSelector').on('change', handleConversationSelect);
   $('#loadThreadBtn').on('click', loadThread);
   $('#saveThreadBtn').on('click', saveThread);
-  $('#clearChatBtn').on('click', clearChat);
+  // Clear chat handler defined in SidebarAppInit (includes server-side API call)
   
   // Message input textarea
   $('#messageInput').on('keydown', handleKeyDown);
@@ -591,32 +611,8 @@ const saveThread = () => {
     // saveConversation removed - conversations auto-save to Drive via DriveJournal
 };
 
-const clearChat = () => {
-  if (confirm('Clear conversation?')) {
-    $('#chatContainer').empty();
-    
-    // Clear global state
-    window.currentConversation = [];
-    
-    // Clear command history
-    commandHistory = [];
-    historyIndex = -1;
-    
-    // Clear message queue
-    messageQueue = [];
-    isProcessing = false;
-    updateQueueStatus();
-    
-    // Stop any active thinking poll and clear both bubbles
-    stopThinkingPoll();
-    clearAllThinkingBubbles();
-    
-    // Stop status timer
-    stopStatusTimer();
-    
-    updateStatus('Conversation cleared', 'success');
-  }
-};
+// clearChat handler moved to SidebarAppInit (includes server-side API call)
+// See sheets-sidebar/html/include/SidebarAppInit for the implementation
 
 // Config management
 const loadConfig = () => {
@@ -796,10 +792,60 @@ const showToast = (message, type = 'info', duration = 4000) => {
 const handleMessageSent = (response) => {
   // Check if response exists
   if (!response) {
-    console.error('No response received from server');
+    // Check if thinking messages arrived successfully (indicates server completed work)
+    // This can happen when google.script.run times out but server work succeeded
+    const currentRequestMessages = activeRequestId ? 
+      allThinkingMessagesByRequest.get(activeRequestId) || [] : [];
+    const hasThinkingMessages = currentRequestMessages.length > 0;
+    
+    // Check if last thinking message indicates completion
+    const lastThinking = hasThinkingMessages ? 
+      currentRequestMessages[currentRequestMessages.length - 1] : '';
+    const indicatesCompletion = lastThinking && (
+      lastThinking.toLowerCase().includes('done') ||
+      lastThinking.toLowerCase().includes('complete') ||
+      lastThinking.toLowerCase().includes('finished') ||
+      lastThinking.toLowerCase().includes('inserted') ||
+      lastThinking.toLowerCase().includes('success')
+    );
+    
+    console.warn('[handleMessageSent] No response received from server', {
+      hasThinkingMessages: hasThinkingMessages,
+      thinkingCount: currentRequestMessages.length,
+      indicatesCompletion: indicatesCompletion,
+      lastThinkingPreview: lastThinking?.substring(0, 100),
+      timestamp: new Date().toISOString()
+    });
+    
     stopThinkingPoll(); // Make sure polling stops
+    removeLastThinkingBubble();
     hideSpinner();
-    handleError(new Error('No response received from server'));
+    
+    // Stop live timer and show final elapsed time
+    if (messageStartTime) {
+      const elapsed = (Date.now() - messageStartTime) / 1000;
+      stopStatusTimer();
+      messageStartTime = null;
+      updateStatusTime(elapsed);
+    }
+    
+    // If thinking messages indicate completion, don't show error
+    // The work was done successfully, just the response didn't arrive
+    if (indicatesCompletion) {
+      console.log('[handleMessageSent] Server work appears complete despite missing response');
+      showToast('Request completed (response timeout)', 'info', 3000);
+      
+      // Clear processing flag for All Thoughts bubble
+      if (activeRequestId) {
+        const $allThoughts = $(`#allThoughtsBubble-${activeRequestId}`);
+        if ($allThoughts.length) {
+          $allThoughts.removeAttr('data-processing');
+        }
+      }
+    } else {
+      // No indication of completion - show error
+      handleError(new Error('No response received from server'));
+    }
     
     // Reset processing state and continue with next queued message
     isProcessing = false;
@@ -854,11 +900,23 @@ const handleMessageSent = (response) => {
   stopThinkingPoll();
   removeLastThinkingBubble();
   
-  // Clear processing flag from All Thoughts bubble
+  // Collapse All Thoughts bubble and clear processing flag when response arrives
   if (completedRequestId) {
     const $allThoughts = $(`#allThoughtsBubble-${completedRequestId}`);
     if ($allThoughts.length) {
       $allThoughts.removeAttr('data-processing');
+      
+      // Collapse the bubble after a brief delay for smooth UX
+      // (allows user to see final thinking state before collapsing)
+      setTimeout(() => {
+        if ($allThoughts.hasClass('expanded')) {
+          $allThoughts.removeClass('expanded');
+          console.log('[BUBBLE DEBUG] Auto-collapsed All Thoughts bubble on response', {
+            requestId: completedRequestId,
+            timestamp: new Date().toISOString()
+          });
+        }
+      }, 1000); // 1 second delay before collapsing
     }
   }
   
@@ -1469,14 +1527,6 @@ let isProcessing = false;
  * Works on the clicked bubble element
  */
 const toggleAllThoughts = function() {
-  // DIAGNOSTIC: Log toggle function call
-  console.log('[TOGGLE DEBUG] Toggle clicked', {
-    timestamp: new Date().toISOString(),
-    thisElement: this,
-    thisClasses: $(this).attr('class'),
-    bubbleFound: $(this).closest('.all-thoughts-bubble').length > 0
-  });
-  
   const $bubble = $(this).closest('.all-thoughts-bubble');
   
   if (!$bubble.length) {
@@ -1484,25 +1534,11 @@ const toggleAllThoughts = function() {
     return;
   }
   
-  // DIAGNOSTIC: Log before class change
-  console.log('[TOGGLE DEBUG] Before toggle', {
-    currentClasses: $bubble.attr('class'),
-    isCollapsed: $bubble.hasClass('collapsed'),
-    isExpanded: $bubble.hasClass('expanded')
-  });
-  
-  if ($bubble.hasClass('collapsed')) {
-    $bubble.removeClass('collapsed').addClass('expanded');
-  } else if ($bubble.hasClass('expanded')) {
-    $bubble.removeClass('expanded').addClass('collapsed');
-  }
-  
-  // DIAGNOSTIC: Log after class change
-  console.log('[TOGGLE DEBUG] After toggle', {
-    newClasses: $bubble.attr('class'),
-    isCollapsed: $bubble.hasClass('collapsed'),
-    isExpanded: $bubble.hasClass('expanded')
-  });
+  // Simple toggle: just add/remove .expanded class
+  // CSS relies on presence of .expanded (not a .collapsed class)
+  // Base state (no .expanded) = collapsed (max-height: 0, opacity: 0)
+  // Expanded state (.expanded) = visible (max-height: none, opacity: 1)
+  $bubble.toggleClass('expanded');
 };
 
 /**
@@ -1675,9 +1711,9 @@ const displayAllThoughts = (requestId) => {
     // Render messages with Gemini-inspired styling using .thinking-message CSS
     if (messages.length > 0) {
       const html = messages.map(msg => {
-        // Escape HTML for safety, wrap in styled div
-        const escaped = $('<div>').text(msg).html();
-        return `<div class="thinking-message">${escaped}</div>`;
+        // Convert markdown to HTML for proper formatting in thinking bubbles
+        const htmlContent = convertMarkdownToHtml(msg);
+        return `<div class="thinking-message">${htmlContent}</div>`;
       }).join('');
       $content.html(html);
     } else {
@@ -1826,6 +1862,7 @@ const processQueue = () => {
   updateQueueStatus();
   
   // Start tracking time and show spinner
+  $('#statusArea').show();  // Make sure status area is visible
   startStatusTimer();
   showSpinner();
   

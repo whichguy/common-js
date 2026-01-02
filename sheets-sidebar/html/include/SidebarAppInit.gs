@@ -164,6 +164,21 @@
         // Clear client-side state
         currentMessages = [];
         currentThreadId = null;
+        window.currentConversation = [];
+        
+        // Clear message queue and processing state
+        if (typeof messageQueue !== 'undefined') {
+          messageQueue = [];
+          isProcessing = false;
+          if (typeof updateQueueStatus === 'function') updateQueueStatus();
+        }
+        
+        // Stop any active thinking poll and clear bubbles
+        if (typeof stopThinkingPoll === 'function') stopThinkingPoll();
+        if (typeof clearAllThinkingBubbles === 'function') clearAllThinkingBubbles();
+        
+        // Stop status timer
+        if (typeof stopStatusTimer === 'function') stopStatusTimer();
         
         // Clear UI
         $('#chatContainer').empty();

@@ -498,10 +498,10 @@
     /* Expanded state */
     .all-thoughts-bubble.expanded .all-thoughts-content {
       display: block;
-      max-height: 600px;  /* Expanded height with scrolling */
+      max-height: none;   /* Show all content without height limit */
       opacity: 1;         /* Fully visible */
       padding: 10px 16px; /* Restore padding when expanded */
-      overflow-y: auto;
+      overflow-y: visible; /* No scrolling needed - show all */
       word-wrap: break-word;
       overflow-wrap: break-word;
     }

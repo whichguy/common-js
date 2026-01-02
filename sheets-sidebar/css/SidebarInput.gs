@@ -451,7 +451,7 @@
     display: flex;
     flex-direction: row;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: flex-start;  /* Status left, buttons pushed right via status margin-right: auto */
     width: 100%;
     gap: 16px;
     min-height: 44px;
@@ -466,6 +466,7 @@
     font-size: 11px;
     color: #5f6368;
     line-height: 1;
+    margin-right: auto;  /* Push status to left, buttons to right */
   }
 
   .v2-status-group .status-time,
