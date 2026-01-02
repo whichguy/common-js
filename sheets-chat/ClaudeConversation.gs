@@ -206,10 +206,11 @@
         : this._toolRegistry.getEnabledTools();
 
       // Build API request with tools
-      // Do not set max_tokens - let Claude API use its defaults
+      // max_tokens must be > thinking.budget_tokens when thinking is enabled
       const requestBody = {
         model: modelToUse,
         messages: updatedMessages,
+        max_tokens: enableThinking ? 140000 : 4096,
         tools: toolsToUse
       };
 
@@ -472,10 +473,11 @@
       snippet.push(toolResultMsg);  // Track tool result message in snippet
 
       // Make direct API call with tool results
-      // Do not set max_tokens - let Claude API use its defaults
+      // max_tokens must be > thinking.budget_tokens (128000)
       const requestBody = {
         model: modelToUse,
         messages: updatedMessages,
+        max_tokens: 140000,
         tools: toolsToUse,
         thinking: {
           type: 'enabled',
