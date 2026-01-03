@@ -1363,14 +1363,6 @@ const createMessageElement = (message) => {
   const $messageDiv = $('<div>')
     .addClass(`message-bubble ${message.role}`);
   
-  // Add role label (only for assistant messages)
-  if (message.role === 'assistant') {
-    const $labelDiv = $('<div>')
-      .addClass('message-label')
-      .text('AI');
-    $messageDiv.append($labelDiv);
-  }
-  
   // Process content blocks
   if (Array.isArray(message.content)) {
     message.content.forEach(block => {
@@ -1397,14 +1389,6 @@ const renderMessage = (message, $container) => {
   
   const $messageDiv = $('<div>')
     .addClass(`message-bubble ${message.role}`);
-  
-  // Add role label (only for assistant messages)
-  if (message.role === 'assistant') {
-    const $labelDiv = $('<div>')
-      .addClass('message-label')
-      .text('AI');
-    $messageDiv.append($labelDiv);
-  }
   
   // Process content blocks
   if (Array.isArray(message.content)) {
@@ -2048,51 +2032,49 @@ const processQueue = () => {
   // Call server-side function
   // Send PREVIOUS conversation (without new user message) - server will add it
   
-  google.script.run
-    .withSuccessHandler((response) => {
-      // Parse response if it's a string
-      let parsedResponse = response;
-      if (typeof response === 'string') {
-        try {
-          parsedResponse = JSON.parse(response);
-        } catch (parseError) {
-          console.error('Failed to parse response string:', parseError);
-        }
+  // Use promise-based API and capture return value for cancel functionality
+  currentCancellableCall = window.server.exec_api(
+    null,
+    'sheets-chat/UISupport',
+    'sendMessageToClaude',
+    {
+      text: nextMessage.text || '',
+      messages: window.currentConversation,  // FIX: Use updated conversation, not stale messages variable
+      attachments: attachments,
+      enableThinking: true,
+      requestId: requestId
+    }
+  ).then((response) => {
+    // Parse response if it's a string
+    let parsedResponse = response;
+    if (typeof response === 'string') {
+      try {
+        parsedResponse = JSON.parse(response);
+      } catch (parseError) {
+        console.error('Failed to parse response string:', parseError);
       }
-      
-      handleMessageSent(parsedResponse);
-      
-      // CLEANUP: Clear attachment data from this message to free memory
-      nextMessage.attachments = [];
-    })
-    .withFailureHandler((error) => {
-      // CLEANUP: Clear attachment data even on failure
-      nextMessage.attachments = [];
-      
-      // Check if thinking poll is still active (indicates server still processing)
-      if (thinkingPollInterval && activeRequestId) {
-        // Don't show error or reset state yet
-        // Thinking poll will deliver final response when server completes
-        return;
-      }
-      
-      // Real error or poll already stopped
-      handleError(error);
-      isProcessing = false;
-      processQueue(); // Continue processing despite error
-    })
-    .exec_api(
-      null,
-      'sheets-chat/UISupport',
-      'sendMessageToClaude',
-      {
-        text: nextMessage.text || '',
-        messages: window.currentConversation,  // FIX: Use updated conversation, not stale messages variable
-        attachments: attachments,
-        enableThinking: true,
-        requestId: requestId
-      }
-    );
+    }
+    
+    handleMessageSent(parsedResponse);
+    
+    // CLEANUP: Clear attachment data from this message to free memory
+    nextMessage.attachments = [];
+  }).catch((error) => {
+    // CLEANUP: Clear attachment data even on failure
+    nextMessage.attachments = [];
+    
+    // Check if thinking poll is still active (indicates server still processing)
+    if (thinkingPollInterval && activeRequestId) {
+      // Don't show error or reset state yet
+      // Thinking poll will deliver final response when server completes
+      return;
+    }
+    
+    // Real error or poll already stopped
+    handleError(error);
+    isProcessing = false;
+    processQueue(); // Continue processing despite error
+  });
 };
 
 /**

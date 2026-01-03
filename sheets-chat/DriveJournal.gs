@@ -14,12 +14,7 @@ function _main(
     try {
       const config = new ConfigManager('CLAUDE_CHAT');
       
-      // Check if journaling is enabled (default: true)
-      const journalEnabled = config.get('JOURNAL_ENABLED');
-      if (journalEnabled === 'false' || journalEnabled === false) {
-        return null;
-      }
-      
+      // Journaling is always enabled - conversations are always saved to Drive
       return getJournalFolderForReading();
     } catch (error) {
       log('[DriveJournal] Error getting journal folder: ' + error.message);

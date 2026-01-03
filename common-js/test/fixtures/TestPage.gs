@@ -13,10 +13,10 @@
   <p>Testing the <code>include()</code> function from <code>common-js/html_utils</code></p>
   
   <h2>Test 1: Basic Include</h2>
-  <?!= include('TestComponent') ?>
+  <?!= include('common-js/test/fixtures/TestComponent') ?>
   
   <h2>Test 2: Include with Variables</h2>
-  <?!= includeWithVars('TestComponent', {title: 'Custom Title'}) ?>
+  <?!= includeWithVars('common-js/test/fixtures/TestComponent', {title: 'Custom Title'}) ?>
   
   <p>If you see the test component above, the include functions are working!</p>
 </body>

@@ -596,24 +596,6 @@ function _main(
       let isNew = false;
       let finalConversationId = conversationId;
       
-      // Check if journaling is enabled
-      const config = new ConfigManager('CLAUDE_CHAT');
-      const journalEnabled = config.get('JOURNAL_ENABLED') === 'true';
-      
-      if (!journalEnabled) {
-        Logger.log('Journaling disabled - skipping save');
-        return {
-          success: true,
-          data: {
-            conversationId: null,
-            isNew: false,
-            messageCount: 0,
-            skipped: true,
-            reason: 'journaling_disabled'
-          }
-        };
-      }
-      
       if (!conversationId) {
         // Create new conversation - generate UUID
         finalConversationId = Utilities.getUuid();
@@ -922,7 +904,6 @@ function _main(
       const config = new ConfigManager('CLAUDE_CHAT');
       const apiKey = config.get('API_KEY');
       const modelName = config.get('MODEL_NAME') || 'claude-sonnet-4-latest';
-      const journalEnabled = config.get('JOURNAL_ENABLED') === 'true';
       const journalFolderUrl = config.get('JOURNAL_FOLDER_URL') || '';
       
       // Font size settings (defaults: input=11px, messages=14px)
@@ -934,7 +915,6 @@ function _main(
         config: {
           apiKey: apiKey || '',
           modelName: modelName,
-          journalEnabled: journalEnabled,
           journalFolderUrl: journalFolderUrl,
           inputFontSize: inputFontSize,
           messageFontSize: messageFontSize,
@@ -957,7 +937,7 @@ function _main(
    */
   function saveConfig(params) {
     try {
-      let { apiKey, modelName, journalEnabled, journalFolderUrl, inputFontSize, messageFontSize } = params || {};
+      let { apiKey, modelName, journalFolderUrl, inputFontSize, messageFontSize } = params || {};
       const config = new ConfigManager('CLAUDE_CHAT');
       
       // If apiKey is empty, preserve the existing key
@@ -975,8 +955,7 @@ function _main(
         config.setUser('MODEL_NAME', modelName);
       }
       
-      // Store journal settings (explicitly handle boolean)
-      config.setUser('JOURNAL_ENABLED', journalEnabled ? 'true' : 'false');
+      // Journaling is always enabled - no toggle needed
       
       if (journalFolderUrl !== undefined) {
         config.setUser('JOURNAL_FOLDER_URL', journalFolderUrl || '');

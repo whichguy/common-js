@@ -468,11 +468,7 @@
       
       /* Content area - subtle background */
       .all-thoughts-content {
-        display: block;  /* Always block, control visibility with max-height */
-        max-height: 0;   /* Collapsed state */
-        opacity: 0;
-        overflow: hidden;
-        padding: 0 16px;  /* Collapse padding in hidden state */
+        display: none;   /* Hidden by default */
         font-size: 13px;  /* Increased from 11px */
         color: #44464e;  /* Neutral gray */
         line-height: 1.6;
@@ -481,10 +477,7 @@
         overflow-wrap: break-word;
         background: rgba(248, 241, 246, 0.5);  /* Subtle content background */
         border-top: 1px solid rgba(120, 117, 121, 0.2);  /* Subtle separator */
-        /* Smooth transitions for expand/collapse */
-        transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-                    opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-                    padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        padding: 10px 16px;
       }
       
       /* Empty placeholder styling */
@@ -496,13 +489,8 @@
       
       /* Expanded state */
       .all-thoughts-bubble.expanded .all-thoughts-content {
-        display: block;
-        max-height: none;   /* Show all content without height limit */
-        opacity: 1;         /* Fully visible */
-        padding: 10px 16px; /* Restore padding when expanded */
-        overflow-y: visible; /* No scrolling needed - show all */
-        word-wrap: break-word;
-        overflow-wrap: break-word;
+        display: block;      /* Show content */
+        overflow-y: auto;    /* Allow scrolling if needed */
       }
       
       .all-thoughts-bubble.expanded .all-thoughts-chevron {

@@ -42,6 +42,26 @@
     });
     
     // Cancel button click
+    // -------------------------------------------------------------------------
+    // CANCEL CALLBACK HANDLER
+    // -------------------------------------------------------------------------
+    // This handler is invoked when the user clicks the cancel button.
+    // 
+    // HOW IT WORKS:
+    // 1. `currentCancellableCall` is the API call object returned by
+    //    `window.server.exec_api()` - it must be assigned when starting
+    //    the API call (see sendMessage() in SidebarAppMessaging)
+    // 2. Calling `.cancel(reason)` on it:
+    //    a) Stops the client-side polling controller
+    //    b) Calls server-side `postCancelRequest(requestId, reason)` via gas_client
+    //    c) Server posts cancel message to channel for async pickup
+    // 3. The server checks for cancel requests during long-running operations
+    //    and gracefully stops processing when detected
+    //
+    // REQUIRED IMPLEMENTATION:
+    // - Client: Assign `currentCancellableCall = window.server.exec_api(...)`
+    // - Server: Implement `postCancelRequest(requestId, reason)` in UISupport
+    // -------------------------------------------------------------------------
     $('#cancelBtn').on('click', function() {
       console.log('[SidebarApp] Cancel button clicked');
       if (currentCancellableCall) {

@@ -889,15 +889,7 @@
           var $journalSection = $('<div class="settings-section"></div>');
           $journalSection.html('<h4>Conversation Journal</h4>');
           
-          // Journal enabled checkbox
-          var $journalEnabledGroup = $('<div class="form-group"></div>');
-          var journalEnabled = config.journalEnabled !== 'false'; // Default to true
-          $journalEnabledGroup.html(
-            '<label class="checkbox-label">' +
-              '<input type="checkbox" id="journalEnabledInput" ' + (journalEnabled ? 'checked' : '') + ' />' +
-              'Save conversation history to Google Drive' +
-            '</label>'
-          );
+          // Note: Journaling is always enabled - only folder selection shown
           
           // Journal folder field with folder picker button
           var $journalFolderGroup = $('<div class="form-group"></div>');
@@ -914,7 +906,7 @@
             '</div>'
           );
           
-          $journalSection.append($journalEnabledGroup, $journalFolderGroup);
+          $journalSection.append($journalFolderGroup);
           
           // Display settings section
           var $displaySection = $('<div class="settings-section"></div>');
@@ -994,7 +986,6 @@
           $saveBtn.on('click', function() {
             var apiKey = $('#apiKeyInput').val().trim();
             var modelName = $('#modelNameInput').val();
-            var journalEnabled = $('#journalEnabledInput').is(':checked');
             var journalFolderUrl = $('#journalFolderUrl').val().trim();
             
             // Get font size values
@@ -1015,7 +1006,6 @@
               {
                 apiKey: apiKey,
                 modelName: modelName,
-                journalEnabled: journalEnabled,
                 journalFolderUrl: journalFolderUrl || '', // Empty string for default
                 inputFontSize: inputFontSize,
                 messageFontSize: messageFontSize
