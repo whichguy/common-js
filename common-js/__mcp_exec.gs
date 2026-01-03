@@ -351,51 +351,23 @@ function jsonResponse(data) {
 
 /**
  * Standardized error response with logger output
- * Security: Stack traces only shown in /dev mode to prevent information disclosure
  */
 function errorResponse(error, context, code = 'unknown', loggerOutput = '') {
   console.error(`Error in ${context}:`, error.toString());
 
   const currentUrl = ScriptApp.getService().getUrl();
-  const isDevMode = currentUrl.endsWith('/dev');
-
-  // Safe stack extraction with length limit (8KB max)
-  const MAX_STACK_LENGTH = 8192;
-  let rawStack = '';
-  try {
-    if (error && typeof error === 'object' && typeof error.stack === 'string') {
-      rawStack = error.stack;
-    } else if (error && typeof error.toString === 'function') {
-      rawStack = error.toString();
-    } else {
-      rawStack = String(error);
-    }
-  } catch (e) {
-    rawStack = '[Error serializing stack trace]';
-  }
-
-  // Truncate long stacks and filter by environment
-  let stack;
-  if (isDevMode) {
-    stack = rawStack.length > MAX_STACK_LENGTH
-      ? rawStack.substring(0, MAX_STACK_LENGTH) + '\n... [truncated, ' + (rawStack.length - MAX_STACK_LENGTH) + ' chars hidden]'
-      : rawStack;
-  } else {
-    stack = '[Stack trace hidden in production - use /dev deployment for debugging]';
-  }
 
   return jsonResponse({
     error: true,
     context: context,
     function_called: code,
     message: error.toString(),
-    stack: stack,
     logger_output: loggerOutput,
     accessed_url: currentUrl,
     url_type: currentUrl.endsWith('/dev') ? 'HEAD deployment (testing)' : currentUrl.endsWith('/exec') ? 'Deployment (may be redirected from /dev)' : 'Unknown deployment type',
     debug_info: {
       timestamp: new Date().toISOString(),
-      deployment_mode: isDevMode ? 'development' : currentUrl.endsWith('/exec') ? 'redirected' : 'unknown'
+      deployment_mode: currentUrl.endsWith('/dev') ? 'development' : currentUrl.endsWith('/exec') ? 'redirected' : 'unknown'
     }
   });
 }
@@ -450,7 +422,7 @@ function htmlAuthSuccessResponse(executionResult) {
       '    .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 20px; border-radius: 4px; }\n' +
       '    .success { color: #198754; font-size: 18px; margin-bottom: 20px; }\n' +
       '    .error { color: #dc3545; margin: 15px 0; }\n' +
-      '    .info { background: var(--color-bg-light); padding: 15px; border-radius: 4px; margin: 15px 0; }\n' +
+      '    .info { background: #f8f9fa; padding: 15px; border-radius: 4px; margin: 15px 0; }\n' +
       '    code { background: #e9ecef; padding: 2px 6px; border-radius: 3px; font-family: monospace; }\n' +
       '    ul { line-height: 1.8; }\n' +
       '  </style>\n' +
@@ -617,14 +589,14 @@ function htmlAuthSuccessResponse(executionResult) {
 
   /**
    * Get deployment URLs for dev/staging/prod environments
-   * Reads from ConfigManager where mcp_gas deploy tool stores URLs
+   * Queries Apps Script API to list deployments filtered by ENV_TAGS
    * @returns {{dev: string|null, staging: string|null, prod: string|null, error?: string}}
    */
   function getDeploymentUrls() {
     try {
       var ConfigManager = require('gas-properties/ConfigManager');
       var config = new ConfigManager('DEPLOY');
-
+      
       return {
         dev: config.get('DEV_URL') || ScriptApp.getService().getUrl(),
         staging: config.get('STAGING_URL'),
@@ -1015,7 +987,7 @@ function htmlAuthErrorResponse(errorData) {
       '    .error-box { background: #f8d7da; border-left: 4px solid #dc3545; padding: 20px; border-radius: 4px; margin-bottom: 20px; }\n' +
       '    .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 20px; border-radius: 4px; }\n' +
       '    .error-title { color: #dc3545; font-size: 18px; margin-bottom: 20px; }\n' +
-      '    .info { background: var(--color-bg-light); padding: 15px; border-radius: 4px; margin: 15px 0; }\n' +
+      '    .info { background: #f8f9fa; padding: 15px; border-radius: 4px; margin: 15px 0; }\n' +
       '    code { background: #e9ecef; padding: 2px 6px; border-radius: 3px; font-family: monospace; }\n' +
       '    pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }\n' +
       '    ul { line-height: 1.8; }\n' +
@@ -1032,7 +1004,7 @@ function htmlAuthErrorResponse(errorData) {
       (errorDetails ? '    <p><strong>Details:</strong> ' + errorDetails + '</p>\n' : '') +
       '  </div>\n' +
       (logger ? '  <details>\n' +
-        '    <summary style="cursor: pointer; padding: 10px; background: var(--color-bg-light); border-radius: 4px;">Show Logger Output</summary>\n' +
+        '    <summary style="cursor: pointer; padding: 10px; background: #f8f9fa; border-radius: 4px;">Show Logger Output</summary>\n' +
         '    <pre>' + logger + '</pre>\n' +
         '  </details>\n' : '') +
       '  \n' +
@@ -1126,7 +1098,16 @@ function invoke(modulePath, ...args) {
  */
 function exec_api(options, moduleName, functionName) {
   var args = Array.prototype.slice.call(arguments);
-  return require('common-js/__mcp_exec').exec_api.apply(null, args);
+  var result = require('common-js/__mcp_exec').exec_api.apply(null, args);
+  Logger.log('[exec_api BRIDGE] Return value check: ' + JSON.stringify({
+    hasValue: !!result,
+    isNull: result === null,
+    isUndefined: result === undefined,
+    type: typeof result,
+    moduleName: moduleName,
+    functionName: functionName
+  }));
+  return result;
 }
 
-__defineModule__(_main, true, { explicitName: 'common-js/__mcp_exec' });
+__defineModule__(_main, 'common-js/__mcp_exec', { loadNow: true });

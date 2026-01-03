@@ -57,17 +57,15 @@
     integrity="sha256-0kaYYq3qitkkVZpP/6uKTJwfTpqFNM6OHDbsaYzw9Uw="
     crossorigin="anonymous"></script>
   
-  <!-- Template Includes: CSS Split into Logical Files -->
+  <!-- Template Includes: CSS Split into 3 Logical Files -->
   <!-- ⚠️ CSS INCLUDE ORDER - DO NOT CHANGE ⚠️ -->
-  <!-- Variables must load first (design tokens), then Core, Bubbles, Input, Styles -->
+  <!-- Core must load first (foundation), then Bubbles, then Input -->
   <!-- All  include()  scriptlets evaluate server-side and inject inline. -->
   <!-- Note: These are HTML files, NOT CommonJS modules. -->
-  <!-- Cache refresh timestamp: 2026-01-02 - Added SidebarVariables -->
-  <?!= include('sheets-sidebar/css/SidebarVariables') ?>
+  <!-- Cache refresh timestamp: 2025-11-03 15:10 UTC -->
   <?!= include('sheets-sidebar/css/SidebarCore') ?>
   <?!= include('sheets-sidebar/css/SidebarBubbles') ?>
   <?!= include('sheets-sidebar/css/SidebarInput') ?>
-  <?!= include('sheets-sidebar/SidebarStyles') ?>
 </head>
 <body>
   <div class="header">
@@ -81,6 +79,12 @@
       </select>
       <button class="icon-btn" id="viewJournalBtn" title="View conversation in Google Drive" style="display: none;">
         <span class="material-icons">folder_open</span>
+      </button>
+      <button class="icon-btn" id="loadThreadBtn" title="Load conversation from sheet">
+        <span class="material-icons">history</span>
+      </button>
+      <button class="icon-btn" id="saveThreadBtn" title="Save conversation to sheet">
+        <span class="material-icons">bookmark_border</span>
       </button>
       <button class="icon-btn" id="clearChatBtn" title="Clear conversation">
         <span class="material-icons">autorenew</span>
@@ -162,31 +166,29 @@
           <div class="form-group">
             <label for="modelName">Model</label>
             <select id="modelName">
-              <option value="claude-sonnet-4-latest" selected>Claude Sonnet 4 (Recommended)</option>
-              <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Fast)</option>
-              <option value="claude-opus-4-latest">Claude Opus 4 (Most Capable)</option>
+              <option value="claude-sonnet-4-5">Claude Sonnet 4.5</option>
+              <option value="claude-haiku-4-5" selected>Claude Haiku 4.5</option>
+              <option value="claude-opus-4-1">Claude Opus 4.1</option>
             </select>
             <div class="help-text">Select the Claude model to use for conversations</div>
           </div>
           
           <h3 style="margin-top: 24px;">Display Settings</h3>
           <div class="form-group">
-            <label for="inputFontSize">Input Font Size</label>
-            <div style="display: flex; align-items: center; gap: 12px;">
-              <input type="range" id="inputFontSize" min="10" max="18" value="11" style="flex: 1;">
-              <span id="inputFontSizeValue" style="min-width: 40px; text-align: right;">11px</span>
+            <label for="fontSizeSlider">Font Size</label>
+            <div class="slider-container">
+              <input type="range"
+                     id="fontSizeSlider"
+                     min="8"
+                     max="16"
+                     value="10"
+                     step="1"
+                     class="font-slider">
+              <span id="fontSizeValue" class="slider-value">10px</span>
             </div>
-            <div class="help-text">Font size for the message input textarea</div>
+            <div class="help-text">Adjust the font size for messages and UI elements</div>
           </div>
-          <div class="form-group">
-            <label for="messageFontSize">Message Font Size</label>
-            <div style="display: flex; align-items: center; gap: 12px;">
-              <input type="range" id="messageFontSize" min="12" max="20" value="14" style="flex: 1;">
-              <span id="messageFontSizeValue" style="min-width: 40px; text-align: right;">14px</span>
-            </div>
-            <div class="help-text">Font size for chat message bubbles</div>
-          </div>
-          
+
           <h3 style="margin-top: 24px;">Conversation Journal</h3>
           <div class="form-group">
             <label>
@@ -230,10 +232,10 @@
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- Template Include: SidebarScript.gs -->
-  <!-- The <?!= include('SidebarScript') ?> scriptlet evaluates server-side and injects -->
+  <!-- The include() scriptlet evaluates server-side and injects -->
   <!-- the entire contents of SidebarScript.gs inline at this location. -->
   <!-- Note: SidebarScript.gs is an HTML file, NOT a CommonJS module. -->
-  <?!= include('SidebarScript') ?>
+  <?!= include('sheets-sidebar/SidebarScript') ?>
 
   <!-- Template Include: gas_client -->
   <!-- Promise-based wrapper for google.script.run API -->
@@ -241,6 +243,6 @@
 
   <!-- Template Include: SidebarApp.gs -->
   <!-- Main application logic: message history, send button, event handlers -->
-  <?!= includeNested('sheets-sidebar/SidebarApp') ?>
+  <?!= include('sheets-sidebar/SidebarApp') ?>
 </body>
 </html>

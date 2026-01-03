@@ -1,5 +1,5 @@
   // ⚠️ WARNING: This file is an HTML include - DO NOT add CommonJS wrapper!
-  // This file is included in Sidebar.html via includeNested('sheets-sidebar/SidebarApp')
+  // This file is included in Sidebar.gs via include('sheets-sidebar/SidebarApp')
   // Always use raw_write with fileType: "HTML" when editing this file.
 
   // ============================================================================
@@ -21,20 +21,6 @@
   $(document).ready(function() {
     console.log('[SidebarApp] Document ready, initializing event handlers');
     
-    // Tab switching handler
-    $('.tab').on('click', function() {
-      const tabName = $(this).data('tab');
-      console.log('[SidebarApp] Tab clicked:', tabName);
-      
-      // Update tab buttons
-      $('.tab').removeClass('active').attr('aria-selected', 'false');
-      $(this).addClass('active').attr('aria-selected', 'true');
-      
-      // Update tab content panels
-      $('.tab-content').removeClass('active');
-      $('#' + tabName + 'Tab').addClass('active');
-    });
-    
     // Send button click
     $('#sendBtn').on('click', function() {
       console.log('[SidebarApp] Send button clicked');
@@ -42,26 +28,6 @@
     });
     
     // Cancel button click
-    // -------------------------------------------------------------------------
-    // CANCEL CALLBACK HANDLER
-    // -------------------------------------------------------------------------
-    // This handler is invoked when the user clicks the cancel button.
-    // 
-    // HOW IT WORKS:
-    // 1. `currentCancellableCall` is the API call object returned by
-    //    `window.server.exec_api()` - it must be assigned when starting
-    //    the API call (see sendMessage() in SidebarAppMessaging)
-    // 2. Calling `.cancel(reason)` on it:
-    //    a) Stops the client-side polling controller
-    //    b) Calls server-side `postCancelRequest(requestId, reason)` via gas_client
-    //    c) Server posts cancel message to channel for async pickup
-    // 3. The server checks for cancel requests during long-running operations
-    //    and gracefully stops processing when detected
-    //
-    // REQUIRED IMPLEMENTATION:
-    // - Client: Assign `currentCancellableCall = window.server.exec_api(...)`
-    // - Server: Implement `postCancelRequest(requestId, reason)` in UISupport
-    // -------------------------------------------------------------------------
     $('#cancelBtn').on('click', function() {
       console.log('[SidebarApp] Cancel button clicked');
       if (currentCancellableCall) {
@@ -86,8 +52,11 @@
     
     // Combined keydown handler for Enter key and arrow key navigation
     $('#messageInput').on('keydown', function(e) {
+      console.log('[MessageInput] Keydown event:', e.key, 'Shift:', e.shiftKey);
+      
       // Handle Enter key to send (Shift+Enter for new line)
       if (e.key === 'Enter' && !e.shiftKey) {
+        console.log('[MessageInput] Enter pressed, sending message');
         e.preventDefault();
         sendMessage();
         return;  // Exit early after handling
@@ -96,26 +65,33 @@
       // Handle arrow keys for message history navigation
       // Only handle arrow keys if not holding Shift (allow Shift+Arrow for text selection)
       if (e.shiftKey) {
+        console.log('[MessageHistory] Shift key held, allowing default arrow behavior');
         return;
       }
       
       if (e.key === 'ArrowUp') {
+        console.log('[MessageHistory] ArrowUp pressed. Current index:', messageHistory.index, 'History length:', messageHistory.items.length);
         e.preventDefault();
         
         // Start navigating from the end if not already navigating
         if (messageHistory.index === -1) {
           messageHistory.currentDraft = $(this).val();
           messageHistory.index = messageHistory.items.length;
+          console.log('[MessageHistory] Starting navigation. Saved draft:', messageHistory.currentDraft.substring(0, 30));
         }
         
         // Move to previous message
         if (messageHistory.index > 0) {
           messageHistory.index--;
           const message = messageHistory.items[messageHistory.index];
+          console.log('[MessageHistory] Moving to index', messageHistory.index, 'Message:', message.substring(0, 50));
           $(this).val(message);
           updateSendButtonState();
+        } else {
+          console.log('[MessageHistory] Already at beginning of history');
         }
       } else if (e.key === 'ArrowDown') {
+        console.log('[MessageHistory] ArrowDown pressed. Current index:', messageHistory.index, 'History length:', messageHistory.items.length);
         e.preventDefault();
         
         // Only handle if we're currently navigating
@@ -124,13 +100,17 @@
           if (messageHistory.index < messageHistory.items.length - 1) {
             messageHistory.index++;
             const message = messageHistory.items[messageHistory.index];
+            console.log('[MessageHistory] Moving to index', messageHistory.index, 'Message:', message.substring(0, 50));
             $(this).val(message);
           } else {
             // Reached the end, restore current draft
+            console.log('[MessageHistory] Reached end, restoring draft:', messageHistory.currentDraft.substring(0, 30));
             messageHistory.index = -1;
             $(this).val(messageHistory.currentDraft);
           }
           updateSendButtonState();
+        } else {
+          console.log('[MessageHistory] Not currently navigating history');
         }
       }
     });
@@ -184,21 +164,6 @@
         // Clear client-side state
         currentMessages = [];
         currentThreadId = null;
-        window.currentConversation = [];
-        
-        // Clear message queue and processing state
-        if (typeof messageQueue !== 'undefined') {
-          messageQueue = [];
-          isProcessing = false;
-          if (typeof updateQueueStatus === 'function') updateQueueStatus();
-        }
-        
-        // Stop any active thinking poll and clear bubbles
-        if (typeof stopThinkingPoll === 'function') stopThinkingPoll();
-        if (typeof clearAllThinkingBubbles === 'function') clearAllThinkingBubbles();
-        
-        // Stop status timer
-        if (typeof stopStatusTimer === 'function') stopStatusTimer();
         
         // Clear UI
         $('#chatContainer').empty();
@@ -321,29 +286,29 @@
       $(this).val('');
     });
 
+    // Font size slider handler with live preview (input event fires while dragging)
+    $('#fontSizeSlider').on('input', function() {
+      var size = $(this).val();
+      $('#fontSizeValue').text(size + 'px');
+      applyFontSize(size);
+      console.log('[FontSize] Live preview:', size + 'px');
+    });
+
+    // Save font size when slider is released (change event fires on release)
+    $('#fontSizeSlider').on('change', function() {
+      var size = $(this).val();
+      saveFontSize(size);
+      console.log('[FontSize] Saved:', size + 'px');
+    });
+
+    // Load saved font size on init
+    loadSavedFontSize();
+
     // Load saved conversations into dropdown
     loadConversationDropdown();
 
     // Initialize send button state
     updateSendButtonState();
-    
-    // Load saved font sizes on startup (non-blocking)
-    window.server.exec_api(null, CONFIG.api.module, 'getConfig')
-      .then(function(result) {
-        if (result && result.success && result.config) {
-          var cfg = result.config;
-          if (cfg.inputFontSize && cfg.inputFontSize !== 11) {
-            document.documentElement.style.setProperty('--font-size-input', cfg.inputFontSize + 'px');
-          }
-          if (cfg.messageFontSize && cfg.messageFontSize !== 14) {
-            document.documentElement.style.setProperty('--font-size-messages', cfg.messageFontSize + 'px');
-          }
-          console.log('[SidebarApp] Font sizes loaded:', cfg.inputFontSize, cfg.messageFontSize);
-        }
-      })
-      .catch(function(err) {
-        console.warn('[SidebarApp] Could not load font settings:', err);
-      });
     
     // Log initialization complete
     console.log('[SidebarApp] Initialization complete');

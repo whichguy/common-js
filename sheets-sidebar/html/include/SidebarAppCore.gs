@@ -1,14 +1,13 @@
   // ⚠️ WARNING: This file is an HTML include - DO NOT add CommonJS wrapper!
-  // This file is included in Sidebar.gs via includeNested() from SidebarApp
+  // This file is included in Sidebar.gs via include('sheets-sidebar/SidebarApp')
   // Always use raw_write with fileType: "HTML" when editing this file.
-  // NOTE: No script tags - parent SidebarApp provides the single wrapper
 
   console.log('[SidebarApp] Initializing main application - Version 2025-10-31-picker-security-fixes');
 
   // ============================================================================
   // CONFIGURATION CONSTANTS
   // ============================================================================
-  var CONFIG = {
+  const CONFIG = {
     polling: {
       MAX_WAIT_MS: 7000,           // Server waits up to 7s for messages per poll
       CHECK_INTERVAL_MS: 300,      // Server checks every 300ms
@@ -23,8 +22,8 @@
       functions: {
         sendMessage: 'sendMessageToClaude',
         pollMessages: 'pollMessages',
-        // saveConversation removed - auto-saves to Drive
-        loadConversation: 'loadConversation',
+        saveConversation: 'saveConversationToSheet',
+        loadConversation: 'loadConversationFromSheet',
         listConversations: 'listConversations',
         loadCommandHistory: 'loadCommandHistory'
       }
@@ -34,7 +33,7 @@
   // ============================================================================
   // MESSAGE HISTORY MANAGEMENT
   // ============================================================================
-  var messageHistory = {
+  const messageHistory = {
     items: [],           // Array of previous messages
     index: -1,          // Current position in history (-1 = not navigating)
     currentDraft: '',   // Save current draft when starting navigation
@@ -46,27 +45,35 @@
    * @param {string} message - The message to save
    */
   function saveToHistory(message) {
+    console.log('[MessageHistory] saveToHistory called with message:', message ? message.substring(0, 50) + '...' : 'empty');
+    
     if (!message || !message.trim()) {
+      console.log('[MessageHistory] Empty message, skipping save');
       return;
     }
     
-    var trimmedMessage = message.trim();
+    const trimmedMessage = message.trim();
     
     // Don't save duplicate consecutive messages
     if (messageHistory.items.length > 0 && 
         messageHistory.items[messageHistory.items.length - 1] === trimmedMessage) {
+      console.log('[MessageHistory] Duplicate message, skipping save');
       return;
     }
     
     messageHistory.items.push(trimmedMessage);
+    console.log('[MessageHistory] Message added to history. Total:', messageHistory.items.length);
     
     // HIGH-2: Enforce maximum history size
     if (messageHistory.items.length > messageHistory.MAX_ITEMS) {
-      messageHistory.items.shift(); // Remove oldest
+      const removed = messageHistory.items.shift(); // Remove oldest
+      console.log('[MessageHistory] Max size reached, removed oldest message');
     }
     
     messageHistory.index = -1;
     messageHistory.currentDraft = '';
+    
+    console.log('[MessageHistory] Current history items:', messageHistory.items.length, 'Index:', messageHistory.index);
   }
 
   // ============================================================================
@@ -74,8 +81,8 @@
   // ============================================================================
 
   // Cache DOM elements for performance
-  var $cachedSendBtn = null;
-  var $cachedMessageInput = null;
+  let $cachedSendBtn = null;
+  let $cachedMessageInput = null;
 
   /**
    * Update send button enabled/disabled state based on input content
@@ -92,8 +99,8 @@
       }
     }
     
-    var message = $cachedMessageInput.val().trim();
-    var hasMessage = message.length > 0;
+    const message = $cachedMessageInput.val().trim();
+    const hasMessage = message.length > 0;
     
     $cachedSendBtn.prop('disabled', !hasMessage);
     
@@ -108,21 +115,20 @@
   // ============================================================================
   // GLOBAL STATE
   // ============================================================================
-  var currentThreadId = null;  // Track conversation thread
-  var isMessageProcessing = false;    // Track if message is being processed
-  var currentRequestId = null; // Track current request for thinking polling
-  // NOTE: messageStartTime is declared in SidebarScript - do not redeclare here
-  var timerInterval = null;    // Live timer interval for counting up during message send
-  var currentMessages = [];    // Track current conversation messages for saving
-  var loadedConversationId = null; // Track which conversation is currently loaded
-  var currentCancellableCall = null; // Track current CancellableCall for cancel functionality
-  var currentPollingController = null; // Track current polling controller to prevent orphaned loops
-  var promptQueue = []; // FIFO queue for pending prompts when processing
+  let currentThreadId = null;  // Track conversation thread
+  let isProcessing = false;    // Track if message is being processed
+  let currentRequestId = null; // Track current request for thinking polling
+  let messageStartTime = null; // Track message send time for stats display
+  let timerInterval = null;    // Live timer interval for counting up during message send
+  let currentMessages = [];    // Track current conversation messages for saving
+  let loadedConversationId = null; // Track which conversation is currently loaded
+  let currentCancellableCall = null; // Track current CancellableCall for cancel functionality
+  let currentPollingController = null; // Track current polling controller to prevent orphaned loops
 
   // ============================================================================
   // ATTACHMENT CONFIGURATION AND STORAGE
   // ============================================================================
-  var ATTACHMENT_CONFIG = {
+  const ATTACHMENT_CONFIG = {
     // Supported file types (based on Anthropic API specs)
     IMAGE_TYPES: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
     DOCUMENT_TYPES: ['application/pdf'],
@@ -147,7 +153,92 @@
   };
 
   // Attachment storage
-  var currentAttachments = [];
+  let currentAttachments = [];
+
+  // ============================================================================
+  // FONT SIZE MANAGEMENT
+  // ============================================================================
+
+  // Default font size (matches CSS variable --font-size-base)
+  const DEFAULT_FONT_SIZE = 10;
+
+  /**
+   * Apply font size to the document by scaling CSS variables
+   * @param {number} size - Base font size in pixels (8-16)
+   */
+  function applyFontSize(size) {
+    var baseSize = parseInt(size, 10);
+    if (isNaN(baseSize) || baseSize < 8 || baseSize > 16) {
+      console.warn('[FontSize] Invalid size, using default:', DEFAULT_FONT_SIZE);
+      baseSize = DEFAULT_FONT_SIZE;
+    }
+
+    // Calculate the scale factor relative to default
+    var scale = baseSize / DEFAULT_FONT_SIZE;
+
+    // Apply scaled font sizes to :root
+    var root = document.documentElement;
+    root.style.setProperty('--font-size-xs', Math.round(8 * scale) + 'px');
+    root.style.setProperty('--font-size-sm', Math.round(9 * scale) + 'px');
+    root.style.setProperty('--font-size-base', baseSize + 'px');
+    root.style.setProperty('--font-size-md', Math.round(11 * scale) + 'px');
+    root.style.setProperty('--font-size-lg', Math.round(12 * scale) + 'px');
+    root.style.setProperty('--font-size-xl', Math.round(13 * scale) + 'px');
+    root.style.setProperty('--font-size-2xl', Math.round(14 * scale) + 'px');
+
+    console.log('[FontSize] Applied size:', baseSize + 'px', 'scale:', scale.toFixed(2));
+  }
+
+  /**
+   * Load saved font size from ConfigManager and apply it
+   */
+  function loadSavedFontSize() {
+    console.log('[FontSize] Loading saved font size...');
+
+    server.exec_api(null, CONFIG.api.module, 'getFontSize', DEFAULT_FONT_SIZE)
+      .then(function(savedSize) {
+        var size = parseInt(savedSize, 10);
+        if (isNaN(size) || size < 8 || size > 16) {
+          size = DEFAULT_FONT_SIZE;
+        }
+
+        console.log('[FontSize] Loaded saved size:', size);
+
+        // Update slider UI
+        $('#fontSizeSlider').val(size);
+        $('#fontSizeValue').text(size + 'px');
+
+        // Apply the font size
+        applyFontSize(size);
+      })
+      .catch(function(error) {
+        console.warn('[FontSize] Failed to load saved size, using default:', error);
+        // Use default on error
+        applyFontSize(DEFAULT_FONT_SIZE);
+      });
+  }
+
+  /**
+   * Save font size to ConfigManager
+   * @param {number} size - Font size to save
+   */
+  function saveFontSize(size) {
+    console.log('[FontSize] Saving size:', size);
+
+    server.exec_api(null, CONFIG.api.module, 'setFontSize', size)
+      .then(function(result) {
+        if (result && result.success) {
+          console.log('[FontSize] Size saved successfully');
+        } else {
+          console.error('[FontSize] Save failed:', result && result.error);
+          showToast('Failed to save font size setting', 'error');
+        }
+      })
+      .catch(function(error) {
+        console.error('[FontSize] Failed to save size:', error);
+        showToast('Failed to save font size setting', 'error');
+      });
+  }
 
   // ============================================================================
   // UTILITY FUNCTIONS
@@ -167,7 +258,7 @@
     }
     
     // Limit length to prevent DoS
-    var maxLength = 100000; // 100KB
+    const maxLength = 100000; // 100KB
     if (text.length > maxLength) {
       console.warn('[Sanitize] Text exceeds max length, truncating');
       return text.substring(0, maxLength) + '\n\n[... content truncated ...]';
@@ -196,7 +287,7 @@
       }
       
       // Parse markdown to HTML
-      var rawHtml = marked.parse(text, {
+      const rawHtml = marked.parse(text, {
         breaks: true,              // Convert \n to <br>
         gfm: true,                 // GitHub Flavored Markdown
         headerIds: false,          // Don't add IDs to headers (security)
@@ -210,7 +301,7 @@
       }
       
       // Sanitize the HTML with enhanced link security configuration
-      var sanitizedHtml = DOMPurify.sanitize(rawHtml, {
+      const sanitizedHtml = DOMPurify.sanitize(rawHtml, {
         ALLOWED_TAGS: [
           'p', 'br', 'strong', 'em', 'b', 'i', 'u', 's',
           'code', 'pre', 'ul', 'ol', 'li',
@@ -267,7 +358,7 @@
     }
     
     // Only allow Google Drive URLs
-    var drivePattern = /^https:\/\/drive\.google\.com\/drive\/folders\/[a-zA-Z0-9_-]+/;
+    const drivePattern = /^https:\/\/drive\.google\.com\/drive\/folders\/[a-zA-Z0-9_-]+/;
     if (!drivePattern.test(url)) {
       console.warn('[Sanitize] URL does not match Drive folder pattern');
       return '';
@@ -287,7 +378,7 @@
     }
     
     // Remove HTML tags and limit length
-    var withoutHtml = name.replace(/<[^>]*>/g, '');
+    const withoutHtml = name.replace(/<[^>]*>/g, '');
     return withoutHtml.substring(0, 100); // Max 100 chars
   }
 
@@ -309,32 +400,31 @@
     }
     
     // Check if file type is supported
-    var allTypes = ATTACHMENT_CONFIG.IMAGE_TYPES.concat(ATTACHMENT_CONFIG.DOCUMENT_TYPES);
-    if (allTypes.indexOf(file.type) === -1) {
+    const allTypes = [...ATTACHMENT_CONFIG.IMAGE_TYPES, ...ATTACHMENT_CONFIG.DOCUMENT_TYPES];
+    if (!allTypes.includes(file.type)) {
       return {
         valid: false,
-        error: 'Unsupported file type: ' + file.type + '. Supported types: images (JPEG, PNG, GIF, WebP) and PDF'
+        error: `Unsupported file type: ${file.type}. Supported types: images (JPEG, PNG, GIF, WebP) and PDF`
       };
     }
     
     // Check MIME type + extension match (prevent spoofing)
-    var extMatch = file.name.toLowerCase().match(/\.[^.]+$/);
-    var ext = extMatch ? extMatch[0] : '';
-    var validExts = ATTACHMENT_CONFIG.VALID_EXTENSIONS[file.type];
-    if (!validExts || validExts.indexOf(ext) === -1) {
+    const ext = file.name.toLowerCase().match(/\.[^.]+$/)?.[0];
+    const validExts = ATTACHMENT_CONFIG.VALID_EXTENSIONS[file.type];
+    if (!validExts || !validExts.includes(ext)) {
       return {
         valid: false,
-        error: 'File extension ' + ext + ' doesn\'t match type ' + file.type
+        error: `File extension ${ext} doesn't match type ${file.type}`
       };
     }
     
     // Check file size
     if (file.size > ATTACHMENT_CONFIG.MAX_FILE_SIZE) {
-      var fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
-      var limitMB = (ATTACHMENT_CONFIG.MAX_FILE_SIZE / 1024 / 1024).toFixed(0);
+      const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+      const limitMB = (ATTACHMENT_CONFIG.MAX_FILE_SIZE / 1024 / 1024).toFixed(0);
       return {
         valid: false,
-        error: 'File too large: ' + file.name + ' (' + fileSizeMB + 'MB) exceeds ' + limitMB + 'MB limit'
+        error: `File too large: ${file.name} (${fileSizeMB}MB) exceeds ${limitMB}MB limit`
       };
     }
     
@@ -342,7 +432,7 @@
     if (file.size === 0) {
       return {
         valid: false,
-        error: 'Empty file: ' + file.name
+        error: `Empty file: ${file.name}`
       };
     }
     
@@ -356,31 +446,31 @@
    */
   function validateAttachmentLimits(newFileSize) {
     // Calculate current total size
-    var currentSize = currentAttachments.reduce(function(sum, att) { return sum + (att.size || 0); }, 0);
-    var totalSize = currentSize + newFileSize;
+    const currentSize = currentAttachments.reduce((sum, att) => sum + (att.size || 0), 0);
+    const totalSize = currentSize + newFileSize;
     
     // Check total request size (base64 increases size by ~33%)
-    var estimatedBase64Size = totalSize * 1.33;
+    const estimatedBase64Size = totalSize * 1.33;
     if (estimatedBase64Size > ATTACHMENT_CONFIG.MAX_REQUEST_SIZE) {
-      var currentMB = (currentSize / 1024 / 1024).toFixed(2);
-      var newMB = (newFileSize / 1024 / 1024).toFixed(2);
-      var totalMB = (totalSize / 1024 / 1024).toFixed(2);
-      var limitMB = (ATTACHMENT_CONFIG.MAX_REQUEST_SIZE / 1024 / 1024).toFixed(0);
+      const currentMB = (currentSize / 1024 / 1024).toFixed(2);
+      const newMB = (newFileSize / 1024 / 1024).toFixed(2);
+      const totalMB = (totalSize / 1024 / 1024).toFixed(2);
+      const limitMB = (ATTACHMENT_CONFIG.MAX_REQUEST_SIZE / 1024 / 1024).toFixed(0);
       return {
         valid: false,
-        error: 'Total size would exceed ' + limitMB + 'MB limit. Current: ' + currentMB + 'MB, Adding: ' + newMB + 'MB, Total: ' + totalMB + 'MB'
+        error: `Total size would exceed ${limitMB}MB limit. Current: ${currentMB}MB, Adding: ${newMB}MB, Total: ${totalMB}MB`
       };
     }
     
     // Check image count limit
-    var imageCount = currentAttachments.filter(function(att) {
-      return ATTACHMENT_CONFIG.IMAGE_TYPES.indexOf(att.mediaType) !== -1;
-    }).length;
+    const imageCount = currentAttachments.filter(att => 
+      ATTACHMENT_CONFIG.IMAGE_TYPES.includes(att.mediaType)
+    ).length;
     
     if (imageCount >= ATTACHMENT_CONFIG.MAX_IMAGE_COUNT) {
       return {
         valid: false,
-        error: 'Maximum ' + ATTACHMENT_CONFIG.MAX_IMAGE_COUNT + ' images allowed per message'
+        error: `Maximum ${ATTACHMENT_CONFIG.MAX_IMAGE_COUNT} images allowed per message`
       };
     }
     
@@ -393,9 +483,9 @@
    * @returns {boolean} True if file is already attached
    */
   function isDuplicateFile(file) {
-    return currentAttachments.some(function(att) {
-      return att.name === file.name && att.size === file.size;
-    });
+    return currentAttachments.some(att => 
+      att.name === file.name && att.size === file.size
+    );
   }
 
   // ============================================================================
@@ -403,7 +493,7 @@
   // ============================================================================
 
   // Track pending file operations to prevent race conditions
-  var pendingFiles = {};
+  const pendingFiles = new Set();
 
   /**
    * CRITICAL-4: Show loading state for file being processed
@@ -411,24 +501,26 @@
    */
   function showFileLoading(fileName) {
     // CRITICAL-4: Add to pending set to prevent duplicates during processing
-    pendingFiles[fileName] = true;
+    pendingFiles.add(fileName);
     
     // Create a temporary loading chip
-    var $attachmentArea = $('#attachmentPreview');
+    const $attachmentArea = $('#attachmentPreview');
     if (!$attachmentArea.length) {
       console.warn('[Attachment] Preview area not found');
       return;
     }
     
     // Truncate long filenames
-    var displayName = fileName.length > ATTACHMENT_CONFIG.MAX_FILENAME_LENGTH
+    const displayName = fileName.length > ATTACHMENT_CONFIG.MAX_FILENAME_LENGTH
       ? fileName.substring(0, ATTACHMENT_CONFIG.MAX_FILENAME_LENGTH - 3) + '...'
       : fileName;
     
-    var $loadingChip = $('<div class="attachment-chip loading" data-filename="' + fileName + '">' +
-      '<span class="material-icons spinning">refresh</span>' +
-      '<span class="attachment-name">' + displayName + '</span>' +
-      '</div>');
+    const $loadingChip = $(`
+      <div class="attachment-chip loading" data-filename="${fileName}">
+        <span class="material-icons spinning">refresh</span>
+        <span class="attachment-name">${displayName}</span>
+      </div>
+    `);
     
     $attachmentArea.append($loadingChip);
     console.log('[Attachment] Showing loading state for', fileName);
@@ -445,10 +537,10 @@
     }
     
     // CRITICAL-4: Remove from pending set
-    delete pendingFiles[attachment.name];
+    pendingFiles.delete(attachment.name);
     
     // Remove loading chip for this file
-    $('.attachment-chip.loading[data-filename="' + attachment.name + '"]').remove();
+    $(`.attachment-chip.loading[data-filename="${attachment.name}"]`).remove();
     
     // Add to attachments array
     currentAttachments.push(attachment);
@@ -461,3 +553,4 @@
     
     console.log('[Attachment] Added attachment:', attachment.name, 'Total:', currentAttachments.length);
   }
+
