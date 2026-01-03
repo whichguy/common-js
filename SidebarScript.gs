@@ -1824,11 +1824,16 @@ const updateLastThinking = (thinkingText) => {
 /**
  * Display all thinking messages in "All Thoughts" bubble for a specific request
  * Shows content from allThinkingMessages array
+ * Auto-scrolls to bottom if user was already at bottom before update
  * @param {string} requestId - Unique request identifier
  */
 const displayAllThoughts = (requestId) => {
   const $bubble = getOrCreateAllThoughtsBubble(requestId);
   if (!$bubble || !$bubble.length) return;
+  
+  // Check scroll position BEFORE updating content
+  const $container = $('#chatContainer');
+  const wasAtBottom = shouldAutoScroll();
   
   // Update content with all messages from request-specific array
   const $content = $bubble.find('.all-thoughts-content');
@@ -1860,7 +1865,12 @@ const displayAllThoughts = (requestId) => {
       $titleText.text(`Claude's thinking process (${messages.length})`);
     }
   }
-};
+  
+  // Auto-scroll to bottom if user was at bottom before update
+  if (wasAtBottom && $container.length) {
+    $container.scrollTop($container[0].scrollHeight);
+  }
+}
 
 /**
  * Remove "Last Thinking Message" bubble (when AI response arrives)
