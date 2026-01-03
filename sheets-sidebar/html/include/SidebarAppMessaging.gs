@@ -613,7 +613,7 @@
         // Attachment indicator if present
         var attachmentHtml = '';
         if (item.attachments && item.attachments.length > 0) {
-          attachmentHtml = '<span class="material-icons" style="font-size: 14px; color: #5f6368;">attach_file</span>';
+          attachmentHtml = '<span class="material-icons" style="font-size: 14px; color: var(--color-text-secondary);">attach_file</span>';
         }
         
         // Remove button (uses CSS class .pending-message-remove)
