@@ -1,7 +1,6 @@
 function _main(
   module = globalThis.__getCurrentModule(),
-  exports = module.exports,
-  log = globalThis.__getModuleLogFunction?.(module) || (() => {})
+  exports = module.exports
 ) {
   /**
    * Server-side handlers for Claude Chat sidebar
@@ -35,18 +34,13 @@ function _main(
   /**
    * Get API key from ConfigManager hierarchy
    * Priority: User+Doc → Doc → User → Domain → Script
-   * @returns {string} API key from PropertiesService
-   * @throws {Error} If no API key is configured
    */
   function getApiKey() {
     const config = new ConfigManager('CLAUDE_CHAT');
     const apiKey = config.get('API_KEY');
     
-    if (!apiKey) {
-      throw new Error('API key not configured. Please set your API key in Settings.');
-    }
-    
-    return apiKey;
+    // Fallback to default test key if not configured
+    return apiKey || '***REMOVED***';
   }
 
   /**
@@ -102,12 +96,6 @@ function _main(
    * Show the chat sidebar (default/current deployment)
    */
   function showSidebar() {
-    // Load html_utils and explicitly register include functions globally
-    const htmlUtils = require('common-js/html_utils');
-    globalThis.include = htmlUtils.include;
-    globalThis.includeNested = htmlUtils.includeNested;
-    globalThis.includeWithVars = htmlUtils.includeWithVars;
-
     const html = HtmlService.createTemplateFromFile('sheets-sidebar/Sidebar')
       .evaluate()
       .setTitle('Sheet Chat')
@@ -120,12 +108,6 @@ function _main(
    * Show sidebar pointing to Dev deployment
    */
   function showSidebarDev() {
-    // Load html_utils and explicitly register include functions globally
-    const htmlUtils = require('common-js/html_utils');
-    globalThis.include = htmlUtils.include;
-    globalThis.includeNested = htmlUtils.includeNested;
-    globalThis.includeWithVars = htmlUtils.includeWithVars;
-
     const __mcp_exec = require('common-js/__mcp_exec');
     const urls = __mcp_exec.getDeploymentUrls();
     
@@ -144,12 +126,6 @@ function _main(
    * Show sidebar pointing to Staging deployment
    */
   function showSidebarStaging() {
-    // Load html_utils and explicitly register include functions globally
-    const htmlUtils = require('common-js/html_utils');
-    globalThis.include = htmlUtils.include;
-    globalThis.includeNested = htmlUtils.includeNested;
-    globalThis.includeWithVars = htmlUtils.includeWithVars;
-
     const __mcp_exec = require('common-js/__mcp_exec');
     const urls = __mcp_exec.getDeploymentUrls();
     
@@ -168,12 +144,6 @@ function _main(
    * Show sidebar pointing to Prod deployment
    */
   function showSidebarProd() {
-    // Load html_utils and explicitly register include functions globally
-    const htmlUtils = require('common-js/html_utils');
-    globalThis.include = htmlUtils.include;
-    globalThis.includeNested = htmlUtils.includeNested;
-    globalThis.includeWithVars = htmlUtils.includeWithVars;
-
     const __mcp_exec = require('common-js/__mcp_exec');
     const urls = __mcp_exec.getDeploymentUrls();
     
@@ -258,17 +228,9 @@ function _main(
    * Called from client-side
    */
   function sendMessageToClaude(params) {
-    // DIAGNOSTIC: Log raw params at entry point
-    Logger.log('[DEBUG sendMessageToClaude] params type: ' + typeof params);
-    Logger.log('[DEBUG sendMessageToClaude] params: ' + JSON.stringify(params));
-    Logger.log('[DEBUG sendMessageToClaude] params?.requestId: ' + (params?.requestId));
-    
     try {
       // Extract parameters from params object
       const { messages, text, attachments, enableThinking, requestId } = params || {};
-      
-      // DIAGNOSTIC: Log after destructuring
-      Logger.log('[DEBUG sendMessageToClaude] After destructuring - requestId: ' + requestId);
       
       // Clear only THIS request's channel (not all channels)
       const queue = getThinkingQueue();
@@ -329,13 +291,10 @@ function _main(
     } catch (error) {
       Logger.log('Error in sendMessageToClaude: ' + error.message);
       
-      // Classify error for user-friendly display
-      const errorInfo = classifyClaudeError(error.message);
-      
       // Show toast notification for error
       try {
         SpreadsheetApp.getActiveSpreadsheet().toast(
-          errorInfo.userMessage,
+          error.message,
           '❌ Chat Error',
           10
         );
@@ -343,14 +302,10 @@ function _main(
         // Ignore toast errors (might not have permissions)
       }
       
-      // Return serialized error response with classification
+      // Return serialized error response
       return makeSerializable({
         success: false,
         error: error.message,
-        errorType: errorInfo.type,
-        userMessage: errorInfo.userMessage,
-        isRetryable: errorInfo.isRetryable,
-        retryAfterSeconds: errorInfo.retryAfterSeconds,
         errorName: error.name,
         errorStack: error.stack,
         errorString: error.toString()
@@ -363,20 +318,14 @@ function _main(
    * Messages are automatically managed by QueueManager with Cache backing
    */
   function storeThinkingMessage(thinking, sequenceId, requestId) {
-    // DIAGNOSTIC: Log the requestId being used for channel name
-    Logger.log('[DEBUG storeThinkingMessage] requestId received: ' + requestId);
-    Logger.log('[DEBUG storeThinkingMessage] thinking length: ' + (thinking ? thinking.length : 0));
-    
     // Skip empty or whitespace-only thinking messages
     if (!thinking || !thinking.trim()) {
-      Logger.log('[DEBUG storeThinkingMessage] Skipping empty thinking message');
       return;
     }
     
     try {
       const queue = getThinkingQueue();
       const channelName = `thinking-${requestId}`;
-      Logger.log('[DEBUG storeThinkingMessage] Storing to channel: ' + channelName);
       queue.post(channelName, thinking, {
         sequenceId: sequenceId,
         requestId: requestId,
@@ -450,34 +399,6 @@ function _main(
   }
 
   /**
-   * Get OAuth token for Google Picker API
-   * Required for accessing Drive files through the Picker
-   * @returns {string} OAuth access token
-   */
-  function getOAuthToken() {
-    try {
-      return ScriptApp.getOAuthToken();
-    } catch (error) {
-      Logger.log('Error getting OAuth token: ' + error.message);
-      throw error;
-    }
-  }
-
-  /**
-   * Get the Script ID for Google Picker API
-   * Required for the Picker to identify the app
-   * @returns {string} Script ID
-   */
-  function getScriptId() {
-    try {
-      return ScriptApp.getScriptId();
-    } catch (error) {
-      Logger.log('Error getting Script ID: ' + error.message);
-      throw error;
-    }
-  }
-
-  /**
    * Get current user's email for conversation isolation
    * @returns {string} User email
    */
@@ -491,14 +412,159 @@ function _main(
   }
 
   /**
-   * Load conversation from Google Drive by ID
-   * Uses DriveJournal.readJournal() for Drive-based storage
+   * Get or create the Conversations sheet with proper headers
+   * FIX #1: Returns consistent {success, data/error} format
+   * @returns {Object} {success, data: {sheet}, error}
+   */
+  function getOrCreateConversationsSheet() {
+    try {
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      let sheet = ss.getSheetByName('Conversations');
+      
+      if (!sheet) {
+        sheet = ss.insertSheet('Conversations');
+        
+        // Set up headers: ID | Title | User | Data | Saved At | Preview
+        sheet.getRange('A1:F1').setValues([['ID', 'Title', 'User', 'Data', 'Saved At', 'Preview']]);
+        sheet.getRange('A1:F1').setFontWeight('bold');
+        sheet.getRange('A1:F1').setBackground('#4285f4');
+        sheet.getRange('A1:F1').setFontColor('#ffffff');
+        
+        // Set column widths
+        sheet.setColumnWidth(1, 150);  // ID
+        sheet.setColumnWidth(2, 300);  // Title
+        sheet.setColumnWidth(3, 200);  // User
+        sheet.setColumnWidth(4, 100);  // Data (hidden)
+        sheet.setColumnWidth(5, 150);  // Saved At
+        sheet.setColumnWidth(6, 300);  // Preview
+        
+        // Hide Data column (contains JSON)
+        sheet.hideColumns(4);
+        
+        Logger.log('Created new Conversations sheet');
+      }
+      
+      return {
+        success: true,
+        data: { sheet: sheet }
+      };
+    } catch (error) {
+      Logger.log('Error in getOrCreateConversationsSheet: ' + error.message);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Save conversation to sheet with auto-generated ID and title
+   * FIX #1: Returns consistent {success, data/error} format
+   * FIX #2: Validates messages data before processing
+   * FIX #5: Includes user email for isolation
+   * @param {Array} messages - Conversation messages
+   * @returns {Object} {success, data: {id, title, savedAt}, error}
+   */
+  function saveConversationToSheet(messages) {
+    try {
+      // FIX #2: Validate input
+      if (!messages || !Array.isArray(messages)) {
+        return {
+          success: false,
+          error: 'Invalid messages: must be an array'
+        };
+      }
+      
+      const sheetResult = getOrCreateConversationsSheet();
+      if (!sheetResult.success) {
+        return sheetResult;  // Return error from getOrCreateConversationsSheet
+      }
+      
+      const sheet = sheetResult.data.sheet;
+      const timestamp = new Date().toISOString();
+      
+      // Generate unique ID
+      const id = Date.now() + '-' + Math.random().toString(36).substring(2, 8);
+      
+      // FIX #5: Get current user email
+      const userEmail = getCurrentUserEmail();
+      
+      // Truncate if needed (max 20 messages to prevent sheet size issues)
+      const truncatedMessages = messages.slice(-20);
+      
+      // Extract first user message for preview and title
+      const firstUserMsg = truncatedMessages.find(msg => msg && msg.role === 'user');
+      const preview = firstUserMsg ? (firstUserMsg.content || '').substring(0, 100) : '(empty conversation)';
+      
+      // Auto-generate title
+      const date = new Date();
+      const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      const messagePreview = preview.length > 30 ? preview.substring(0, 30) + '...' : preview;
+      const title = `Chat ${dateStr}, ${timeStr}: ${messagePreview}`;
+      
+      // Prepare JSON data
+      const jsonData = JSON.stringify({
+        messages: truncatedMessages,
+        savedAt: timestamp,
+        user: userEmail
+      });
+      
+      // FIX #2: Validate JSON serialization
+      try {
+        JSON.parse(jsonData);  // Verify it's valid JSON
+      } catch (parseError) {
+        return {
+          success: false,
+          error: 'Failed to serialize conversation data: ' + parseError.message
+        };
+      }
+      
+      // Find next available row
+      const lastRow = sheet.getLastRow();
+      const nextRow = lastRow + 1;
+      
+      // Append new conversation: ID | Title | User | Data | Saved At | Preview
+      sheet.getRange(`A${nextRow}:F${nextRow}`).setValues([[
+        id,
+        title,
+        userEmail,
+        jsonData,
+        timestamp,
+        preview
+      ]]);
+      
+      Logger.log('Saved conversation to sheet: ' + truncatedMessages.length + ' messages, ID: ' + id + ', User: ' + userEmail);
+      
+      return {
+        success: true,
+        data: {
+          id: id,
+          title: title,
+          savedAt: timestamp,
+          user: userEmail
+        }
+      };
+    } catch (error) {
+      Logger.log('Error saving conversation to sheet: ' + error.message);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Load conversation from sheet by ID
+   * FIX #1: Returns consistent {success, data/error} format
+   * FIX #2: Validates JSON data before parsing
+   * FIX #5: Verifies user has access to conversation
    * @param {string} conversationId - Conversation ID to load
    * @returns {Object} {success, data: {messages, savedAt}, error}
    */
-  function loadConversation(conversationId) {
+  function loadConversationFromSheet(conversationId) {
     try {
-      // Validate input
+      // FIX #2: Validate input
       if (!conversationId || typeof conversationId !== 'string') {
         return {
           success: false,
@@ -506,37 +572,91 @@ function _main(
         };
       }
       
-      const DriveJournal = require('sheets-chat/DriveJournal');
-      const currentUser = getCurrentUserEmail();
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const sheet = ss.getSheetByName('Conversations');
       
-      // Read journal from Drive
-      const result = DriveJournal.readJournal(conversationId);
-      
-      if (!result.success) {
-        Logger.log('Error loading conversation from Drive: ' + result.error);
-        return result;
-      }
-      
-      // Verify user has access (user isolation)
-      if (result.data.userEmail && result.data.userEmail !== currentUser) {
-        Logger.log('Access denied: User ' + currentUser + ' attempted to access conversation owned by ' + result.data.userEmail);
+      if (!sheet) {
         return {
           success: false,
-          error: 'Access denied: You do not have permission to access this conversation'
+          error: 'No Conversations sheet found'
         };
       }
       
-      Logger.log('Loaded conversation from Drive: ' + result.data.messages.length + ' messages, ID: ' + conversationId);
+      // Get all data (skip header row)
+      const lastRow = sheet.getLastRow();
+      if (lastRow < 2) {
+        return {
+          success: false,
+          error: 'No conversations found'
+        };
+      }
+      
+      const data = sheet.getRange(`A2:F${lastRow}`).getValues();
+      
+      // FIX #5: Get current user for isolation check
+      const currentUser = getCurrentUserEmail();
+      
+      // Find row matching the ID
+      for (let i = 0; i < data.length; i++) {
+        const rowId = data[i][0];        // Column A: ID
+        const rowUser = data[i][2];      // Column C: User
+        const jsonData = data[i][3];     // Column D: Data
+        
+        if (rowId === conversationId) {
+          // FIX #5: Verify user has access
+          if (rowUser !== currentUser) {
+            Logger.log('Access denied: User ' + currentUser + ' attempted to access conversation owned by ' + rowUser);
+            return {
+              success: false,
+              error: 'Access denied: You do not have permission to access this conversation'
+            };
+          }
+          
+          if (!jsonData) {
+            return {
+              success: false,
+              error: 'Conversation data is empty'
+            };
+          }
+          
+          // FIX #2: Validate JSON before parsing
+          let parsed;
+          try {
+            parsed = JSON.parse(jsonData);
+          } catch (parseError) {
+            Logger.log('JSON parse error for conversation ' + conversationId + ': ' + parseError.message);
+            return {
+              success: false,
+              error: 'Conversation data is corrupted: ' + parseError.message
+            };
+          }
+          
+          // FIX #2: Validate parsed structure
+          if (!parsed.messages || !Array.isArray(parsed.messages)) {
+            return {
+              success: false,
+              error: 'Conversation data has invalid structure'
+            };
+          }
+          
+          Logger.log('Loaded conversation from sheet: ' + parsed.messages.length + ' messages, ID: ' + conversationId);
+          
+          return {
+            success: true,
+            data: {
+              messages: parsed.messages,
+              savedAt: parsed.savedAt
+            }
+          };
+        }
+      }
       
       return {
-        success: true,
-        data: {
-          messages: result.data.messages,
-          savedAt: result.data.createdAt
-        }
+        success: false,
+        error: 'Conversation not found'
       };
     } catch (error) {
-      Logger.log('Error loading conversation: ' + error.message);
+      Logger.log('Error loading conversation from sheet: ' + error.message);
       return {
         success: false,
         error: error.message
@@ -545,332 +665,77 @@ function _main(
   }
 
   /**
-   * List all conversations for current user from Google Drive
-   * Now uses DriveJournal.listJournals() instead of Sheet-based storage
+   * List all conversations for current user
+   * FIX #1: Returns consistent {success, data/error} format
+   * FIX #5: Filters conversations by current user
    * @returns {Object} {success, data: {conversations}, error}
    */
   function listConversations() {
     try {
-      const DriveJournal = require('sheets-chat/DriveJournal');
-      const currentUser = getCurrentUserEmail();
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const sheet = ss.getSheetByName('Conversations');
       
-      // Get conversations from Drive, filtered by current user
-      const result = DriveJournal.listJournals(currentUser);
-      
-      if (!result.success) {
-        Logger.log('Error listing conversations from Drive: ' + result.error);
-        return result;
+      if (!sheet) {
+        // FIX #1: Return empty array with success=true (not an error condition)
+        return {
+          success: true,
+          data: {
+            conversations: []
+          }
+        };
       }
       
-      Logger.log('Listed ' + result.data.conversations.length + ' conversations from Drive for user: ' + currentUser);
+      // Get all data (skip header row)
+      const lastRow = sheet.getLastRow();
+      if (lastRow < 2) {
+        return {
+          success: true,
+          data: {
+            conversations: []
+          }
+        };
+      }
       
-      return result;
+      const data = sheet.getRange(`A2:F${lastRow}`).getValues();
+      
+      // FIX #5: Get current user for filtering
+      const currentUser = getCurrentUserEmail();
+      
+      // Transform to array of conversation objects, filtering by current user
+      const conversations = data
+        .filter(row => row[0] && row[2] === currentUser)  // Filter: has ID AND matches current user
+        .map(row => ({
+          id: row[0],           // Column A: ID
+          title: row[1],        // Column B: Title
+          user: row[2],         // Column C: User
+          savedAt: row[4],      // Column E: Saved At
+          preview: row[5]       // Column F: Preview
+        }));
+      
+      // Sort by savedAt descending (newest first)
+      conversations.sort((a, b) => {
+        const dateA = new Date(a.savedAt);
+        const dateB = new Date(b.savedAt);
+        return dateB - dateA;
+      });
+      
+      // Limit to 100 most recent conversations
+      const limitedConversations = conversations.slice(0, 100);
+      
+      Logger.log('Listed ' + limitedConversations.length + ' of ' + conversations.length + ' conversations for user: ' + currentUser);
+      
+      return {
+        success: true,
+        data: {
+          conversations: limitedConversations
+        }
+      };
     } catch (error) {
       Logger.log('Error listing conversations: ' + error.message);
       return {
         success: false,
         error: error.message
       };
-    }
-  }
-
-  /**
-   * Save conversation to Google Drive
-   * Creates new journal if conversationId is null, otherwise appends messages
-   * @param {string|null} conversationId - Existing conversation ID or null for new
-   * @param {Array} messages - Messages to save
-   * @returns {Object} {success, data: {conversationId, isNew, messageCount}, error?}
-   */
-  function saveConversation(conversationId, messages) {
-    try {
-      // Validate messages
-      if (!Array.isArray(messages) || messages.length === 0) {
-        return {
-          success: false,
-          error: 'No messages to save'
-        };
-      }
-      
-      const DriveJournal = require('sheets-chat/DriveJournal');
-      const currentUser = getCurrentUserEmail();
-      let isNew = false;
-      let finalConversationId = conversationId;
-      
-      if (!conversationId) {
-        // Create new conversation - generate UUID
-        finalConversationId = Utilities.getUuid();
-        isNew = true;
-        
-        // Create new journal
-        const createResult = DriveJournal.createJournal(finalConversationId, currentUser);
-        if (!createResult.success) {
-          Logger.log('Error creating journal: ' + createResult.error);
-          return createResult;
-        }
-        
-        Logger.log('Created new journal: ' + finalConversationId + ' for user: ' + currentUser);
-      } else {
-        // Verify ownership of existing conversation
-        const readResult = DriveJournal.readJournal(conversationId);
-        
-        if (!readResult.success) {
-          Logger.log('Error reading journal for verification: ' + readResult.error);
-          return readResult;
-        }
-        
-        if (readResult.data.userEmail && readResult.data.userEmail !== currentUser) {
-          Logger.log('Save denied: User ' + currentUser + ' attempted to save to conversation owned by ' + readResult.data.userEmail);
-          return {
-            success: false,
-            error: 'Access denied: You do not have permission to save to this conversation'
-          };
-        }
-      }
-      
-      // Append messages to journal
-      const appendResult = DriveJournal.appendToJournal(finalConversationId, messages);
-      
-      if (!appendResult.success) {
-        Logger.log('Error appending to journal: ' + appendResult.error);
-        return appendResult;
-      }
-      
-      Logger.log('Saved ' + messages.length + ' messages to conversation: ' + finalConversationId + 
-                 ' (isNew: ' + isNew + ') for user: ' + currentUser);
-      
-      return {
-        success: true,
-        data: {
-          conversationId: finalConversationId,
-          isNew: isNew,
-          messageCount: messages.length
-        }
-      };
-    } catch (error) {
-      Logger.log('Error saving conversation: ' + error.message);
-      return {
-        success: false,
-        error: error.message
-      };
-    }
-  }
-
-  /**
-   * Delete a conversation from Google Drive by ID
-   * Uses DriveJournal.deleteJournal() for Drive-based storage
-   * @param {string} conversationId - Conversation ID to delete
-   * @returns {Object} {success, error?}
-   */
-  function deleteConversation(conversationId) {
-    try {
-      // Validate input
-      if (!conversationId || typeof conversationId !== 'string') {
-        return {
-          success: false,
-          error: 'Invalid conversation ID: must be a non-empty string'
-        };
-      }
-      
-      const DriveJournal = require('sheets-chat/DriveJournal');
-      const currentUser = getCurrentUserEmail();
-      
-      // First verify ownership by reading the journal
-      const readResult = DriveJournal.readJournal(conversationId);
-      
-      if (!readResult.success) {
-        return {
-          success: false,
-          error: 'Conversation not found'
-        };
-      }
-      
-      // Verify user has access (user isolation)
-      if (readResult.data.userEmail && readResult.data.userEmail !== currentUser) {
-        Logger.log('Delete denied: User ' + currentUser + ' attempted to delete conversation owned by ' + readResult.data.userEmail);
-        return {
-          success: false,
-          error: 'Access denied: You do not have permission to delete this conversation'
-        };
-      }
-      
-      // Delete from Drive
-      const result = DriveJournal.deleteJournal(conversationId);
-      
-      if (result.success) {
-        Logger.log('Deleted conversation from Drive: ' + conversationId + ' by user: ' + currentUser);
-      }
-      
-      return result;
-    } catch (error) {
-      Logger.log('Error deleting conversation: ' + error.message);
-      return {
-        success: false,
-        error: error.message
-      };
-    }
-  }
-
-  /**
-   * Classify Claude API error for user-friendly display
-   * Maps technical errors to human-readable messages with retry guidance
-   * @param {string} errorMessage - Raw error message from API
-   * @returns {Object} {type, userMessage, isRetryable, retryAfterSeconds}
-   */
-  function classifyClaudeError(errorMessage) {
-    const lowerMessage = (errorMessage || '').toLowerCase();
-    
-    // Rate limit errors (429)
-    if (lowerMessage.includes('rate') || lowerMessage.includes('429')) {
-      return {
-        type: 'RATE_LIMIT',
-        userMessage: 'Claude is receiving too many requests. Please wait a moment and try again.',
-        isRetryable: true,
-        retryAfterSeconds: 30
-      };
-    }
-    
-    // Overloaded errors (529)
-    if (lowerMessage.includes('overloaded') || lowerMessage.includes('529') || lowerMessage.includes('busy')) {
-      return {
-        type: 'OVERLOADED',
-        userMessage: 'Claude is currently busy. Please try again in a few seconds.',
-        isRetryable: true,
-        retryAfterSeconds: 10
-      };
-    }
-    
-    // Credit/billing errors
-    if (lowerMessage.includes('credit') || lowerMessage.includes('billing') || 
-        lowerMessage.includes('insufficient') || lowerMessage.includes('quota')) {
-      return {
-        type: 'CREDIT_BALANCE',
-        userMessage: 'Your API credit balance may be low. Please check your Anthropic account.',
-        isRetryable: false,
-        retryAfterSeconds: null
-      };
-    }
-    
-    // Authentication errors (401)
-    if (lowerMessage.includes('401') || lowerMessage.includes('authentication') ||
-        lowerMessage.includes('unauthorized') || lowerMessage.includes('invalid api key')) {
-      return {
-        type: 'AUTHENTICATION',
-        userMessage: 'API key is invalid or expired. Please update your API key in Settings.',
-        isRetryable: false,
-        retryAfterSeconds: null
-      };
-    }
-    
-    // Permission errors (403)
-    if (lowerMessage.includes('403') || lowerMessage.includes('forbidden') ||
-        lowerMessage.includes('permission')) {
-      return {
-        type: 'PERMISSION',
-        userMessage: 'Access denied. Please check your API key permissions.',
-        isRetryable: false,
-        retryAfterSeconds: null
-      };
-    }
-    
-    // Context length errors
-    if (lowerMessage.includes('context') || lowerMessage.includes('too long') ||
-        lowerMessage.includes('max_tokens') || lowerMessage.includes('token limit')) {
-      return {
-        type: 'CONTEXT_LENGTH',
-        userMessage: 'Message is too long. Please try a shorter message or start a new conversation.',
-        isRetryable: false,
-        retryAfterSeconds: null
-      };
-    }
-    
-    // Server errors (500, 502, 503, 504)
-    if (lowerMessage.includes('500') || lowerMessage.includes('502') ||
-        lowerMessage.includes('503') || lowerMessage.includes('504') ||
-        lowerMessage.includes('server error') || lowerMessage.includes('internal error')) {
-      return {
-        type: 'SERVER_ERROR',
-        userMessage: 'Claude is experiencing temporary issues. Please try again in a moment.',
-        isRetryable: true,
-        retryAfterSeconds: 15
-      };
-    }
-    
-    // Network/timeout errors
-    if (lowerMessage.includes('timeout') || lowerMessage.includes('network') ||
-        lowerMessage.includes('connection') || lowerMessage.includes('fetch')) {
-      return {
-        type: 'NETWORK',
-        userMessage: 'Network connection issue. Please check your internet and try again.',
-        isRetryable: true,
-        retryAfterSeconds: 5
-      };
-    }
-    
-    // Default: unknown error
-    return {
-      type: 'UNKNOWN',
-      userMessage: 'An unexpected error occurred. Please try again.',
-      isRetryable: true,
-      retryAfterSeconds: 5
-    };
-  }
-
-  /**
-   * Load command history for current user
-   * Uses ConfigManager for hierarchical property management
-   * @returns {Object} {success, history[]}
-   */
-  function loadCommandHistory() {
-    try {
-      const config = new ConfigManager('CLAUDE_CHAT');
-      const historyJson = config.get('COMMAND_HISTORY');
-
-      if (!historyJson) {
-        return { success: true, history: [] };
-      }
-
-      const history = JSON.parse(historyJson);
-      return {
-        success: true,
-        history: Array.isArray(history) ? history : []
-      };
-    } catch (e) {
-      Logger.log('[UISupport] Failed to load command history: ' + e.message);
-      return { success: false, history: [], error: e.message };
-    }
-  }
-
-  /**
-   * Save command to history for current user
-   * @param {string} command - The command to save
-   * @returns {Object} {success, skipped?}
-   */
-  function saveCommandToHistory(command) {
-    try {
-      if (!command || typeof command !== 'string') {
-        return { success: false, error: 'Invalid command' };
-      }
-
-      const config = new ConfigManager('CLAUDE_CHAT');
-      const historyJson = config.get('COMMAND_HISTORY');
-      let history = historyJson ? JSON.parse(historyJson) : [];
-
-      // Skip duplicates
-      if (history.length > 0 && history[history.length - 1] === command.trim()) {
-        return { success: true, skipped: true };
-      }
-
-      // Add and limit to 100 items
-      history.push(command.trim());
-      if (history.length > 100) {
-        history = history.slice(-100);
-      }
-
-      config.setUser('COMMAND_HISTORY', JSON.stringify(history));
-      return { success: true };
-    } catch (e) {
-      Logger.log('[UISupport] Failed to save command: ' + e.message);
-      return { success: false, error: e.message };
     }
   }
 
@@ -897,29 +762,23 @@ function _main(
 
   /**
    * Get configuration
-   * Returns current API key, model name, and journal settings
+   * Returns current API key (masked) and model name
    */
   function getConfig() {
     try {
       const config = new ConfigManager('CLAUDE_CHAT');
       const apiKey = config.get('API_KEY');
-      const modelName = config.get('MODEL_NAME') || 'claude-sonnet-4-latest';
-      const journalFolderUrl = config.get('JOURNAL_FOLDER_URL') || '';
-      
-      // Font size settings (defaults: input=11px, messages=14px)
-      const inputFontSize = parseInt(config.get('INPUT_FONT_SIZE') || '11', 10);
-      const messageFontSize = parseInt(config.get('MESSAGE_FONT_SIZE') || '14', 10);
+      const modelName = config.get('MODEL_NAME') || 'claude-haiku-4-5';
       
       return {
         success: true,
-        config: {
-          apiKey: apiKey || '',
-          modelName: modelName,
-          journalFolderUrl: journalFolderUrl,
-          inputFontSize: inputFontSize,
-          messageFontSize: messageFontSize,
-          hasOverride: config.isOverridden('API_KEY'),
-          enforcementSource: config.getEnforcementSource('API_KEY')
+        data: {
+          config: {
+            apiKey: apiKey || '',
+            modelName: modelName,
+            hasOverride: config.isOverridden('API_KEY'),
+            enforcementSource: config.getEnforcementSource('API_KEY')
+          }
         }
       };
     } catch (error) {
@@ -933,42 +792,23 @@ function _main(
 
   /**
    * Save configuration
-   * Stores API key, model name, and journal settings in PropertiesService
+   * Stores API key and model name in PropertiesService
    */
   function saveConfig(params) {
     try {
-      let { apiKey, modelName, journalFolderUrl, inputFontSize, messageFontSize } = params || {};
+      const { apiKey, modelName } = params || {};
       const config = new ConfigManager('CLAUDE_CHAT');
-      
-      // If apiKey is empty, preserve the existing key
-      if (!apiKey || !apiKey.trim()) {
-        apiKey = config.get('API_KEY');
-      }
-      
+
       if (apiKey) {
         // Store at user-global scope (works across all documents)
         config.setUser('API_KEY', apiKey);
       }
-      
+
       if (modelName) {
         // Store model name at user-global scope
         config.setUser('MODEL_NAME', modelName);
       }
-      
-      // Journaling is always enabled - no toggle needed
-      
-      if (journalFolderUrl !== undefined) {
-        config.setUser('JOURNAL_FOLDER_URL', journalFolderUrl || '');
-      }
-      
-      // Store font size settings
-      if (inputFontSize !== undefined) {
-        config.setUser('INPUT_FONT_SIZE', String(inputFontSize));
-      }
-      if (messageFontSize !== undefined) {
-        config.setUser('MESSAGE_FONT_SIZE', String(messageFontSize));
-      }
-      
+
       return {
         success: true
       };
@@ -981,36 +821,40 @@ function _main(
   }
 
   /**
-   * Get theme preference for current user/document
-   * @returns {Object} {success, theme: 'auto'|'light'|'dark'}
+   * Get font size setting
+   * @param {number} defaultValue - Default value if not set
+   * @returns {number} Font size in pixels
    */
-  function getThemePreference() {
+  function getFontSize(defaultValue) {
     try {
       const config = new ConfigManager('CLAUDE_CHAT');
-      const theme = config.get('SIDEBAR_THEME') || 'auto';
-      return { success: true, theme: theme };
-    } catch (e) {
-      Logger.log('[UISupport] Failed to load theme: ' + e.message);
-      return { success: true, theme: 'auto' };  // Default to auto on error
+      const size = config.get('FONT_SIZE', defaultValue);
+      return parseInt(size, 10) || defaultValue;
+    } catch (error) {
+      Logger.log('Error getting font size: ' + error.message);
+      return defaultValue;
     }
   }
 
   /**
-   * Set theme preference for current user/document
-   * @param {string} theme - 'auto', 'light', or 'dark'
-   * @returns {Object} {success, error?}
+   * Set font size setting
+   * @param {number} size - Font size in pixels (8-16)
+   * @returns {Object} Result with success flag
    */
-  function setThemePreference(theme) {
+  function setFontSize(size) {
     try {
-      if (!['auto', 'light', 'dark'].includes(theme)) {
-        return { success: false, error: 'Invalid theme: must be auto, light, or dark' };
+      const parsedSize = parseInt(size, 10);
+      if (isNaN(parsedSize) || parsedSize < 8 || parsedSize > 16) {
+        return { success: false, error: 'Font size must be between 8 and 16' };
       }
+
       const config = new ConfigManager('CLAUDE_CHAT');
-      config.setUserDoc('SIDEBAR_THEME', theme);
+      config.setUser('FONT_SIZE', parsedSize.toString());
+
       return { success: true };
-    } catch (e) {
-      Logger.log('[UISupport] Failed to save theme: ' + e.message);
-      return { success: false, error: e.message };
+    } catch (error) {
+      Logger.log('Error setting font size: ' + error.message);
+      return { success: false, error: error.message };
     }
   }
 
@@ -1023,24 +867,20 @@ function _main(
     showSidebarProd,
     sendMessageToClaude,
     storeThinkingMessage,
-    pollMessages,
+    pollMessages,  // NEW: Generic polling function
     clearChat,
     getConfig,
     saveConfig,
+    getFontSize,
+    setFontSize,
     getApiKey,
     getNextSequenceId,
     clearSequenceCounter,
-    loadConversation,
-    saveConversation,
-    deleteConversation,
+    getOrCreateConversationsSheet,
+    saveConversationToSheet,
+    loadConversationFromSheet,
     listConversations,
-    getCurrentUserEmail,
-    getOAuthToken,
-    getScriptId,
-    loadCommandHistory,
-    saveCommandToHistory,
-    getThemePreference,
-    setThemePreference
+    getCurrentUserEmail
   };
 
   // Register event handlers
@@ -1055,21 +895,16 @@ function _main(
     showSidebarStaging,
     showSidebarProd,
     sendMessageToClaude,
-    pollMessages,
+    pollMessages,  // NEW: Generic polling function
     clearChat,
     getConfig,
     saveConfig,
     getNextSequenceId,
     clearSequenceCounter,
-    loadConversation,
-    saveConversation,
-    deleteConversation,
-    listConversations,
-    loadCommandHistory,
-    saveCommandToHistory,
-    getThemePreference,
-    setThemePreference
+    saveConversationToSheet,
+    loadConversationFromSheet,
+    listConversations
   };
 }
 
-__defineModule__(_main, true);
+__defineModule__(_main);
