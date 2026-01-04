@@ -328,7 +328,7 @@
         CONFIG.api.functions.sendMessage,
         {
           threadId: currentThreadId,
-          message: messageContent,
+          text: messageContent,
           enableThinking: true,
           requestId: currentRequestId
         }
