@@ -341,4 +341,4 @@ function _main(
   module.exports = QueueManager;
 }
 
-__defineModule__(_main);
+__defineModule__(_main, false, { explicitName: 'gas-queue/QueueManager' });

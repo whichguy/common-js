@@ -510,7 +510,7 @@
     // Append new messages
     let addedCount = 0;
     newMessages.forEach(msg => {
-      const thinkingText = sanitizeThinkingText(msg.text);
+      const thinkingText = typeof msg === 'string' ? sanitizeThinkingText(msg) : sanitizeThinkingText(msg.text);
       if (thinkingText.trim()) {
         const htmlContent = convertMarkdownToHtml(thinkingText);
         const $thinkingMsg = $('<div class="thinking-message"></div>');
@@ -532,10 +532,10 @@
     }
     
     // Auto-expand on first message
+    // Note: CSS handles chevron rotation via transform when .expanded class is added
     if (!$bubble.hasClass('expanded') && totalCount === 1) {
       console.log('[ThinkingBubble] Auto-expanding bubble on first message');
       $bubble.addClass('expanded');
-      $bubble.find('.all-thoughts-chevron').text('expand_more');
     }
     
     // Scroll to bottom of thinking content

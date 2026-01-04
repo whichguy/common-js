@@ -240,14 +240,9 @@
     `);
     
     // Add click handler for expand/collapse
+    // Note: CSS handles chevron rotation via transform when .expanded class is toggled
     $thinkingBubble.find('.all-thoughts-header').on('click', function() {
       $thinkingBubble.toggleClass('expanded');
-      const $chevron = $thinkingBubble.find('.all-thoughts-chevron');
-      if ($thinkingBubble.hasClass('expanded')) {
-        $chevron.text('expand_more');
-      } else {
-        $chevron.text('chevron_right');
-      }
     });
     
     $('#chatContainer').append($thinkingBubble);
