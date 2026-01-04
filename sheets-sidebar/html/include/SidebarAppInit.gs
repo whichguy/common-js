@@ -306,6 +306,91 @@
 
     // Load saved font size on init
     loadSavedFontSize();
+    
+    // Save Config button click handler
+    $('#saveConfigBtn').on('click', function() {
+      console.log('[Config] Save button clicked');
+      var $btn = $(this);
+      var $status = $('#configStatus');
+      
+      // Get form values
+      var apiKey = $('#apiKey').val().trim();
+      var modelName = $('#modelName').val();
+      var journalEnabled = $('#journalEnabled').is(':checked');
+      var journalFolderUrl = $('#journalFolderUrl').val().trim();
+      
+      // Disable button during save
+      $btn.prop('disabled', true).text('Saving...');
+      $status.text('').removeClass('error success');
+      
+      // Build config object
+      var configData = {
+        modelName: modelName
+      };
+      
+      // Only include API key if it was changed (not empty)
+      if (apiKey) {
+        configData.apiKey = apiKey;
+      }
+      
+      // Save config to server
+      server.exec_api(null, CONFIG.api.module, 'saveConfig', configData)
+        .then(function(result) {
+          if (result && result.success) {
+            console.log('[Config] Saved successfully');
+            $status.text('Configuration saved!').addClass('success');
+            showToast('Configuration saved successfully', 'success');
+          } else {
+            console.error('[Config] Save failed:', result);
+            $status.text('Failed to save: ' + (result.error || 'Unknown error')).addClass('error');
+            showToast('Failed to save configuration', 'error');
+          }
+        })
+        .catch(function(error) {
+          console.error('[Config] Save error:', error);
+          $status.text('Error: ' + error.message).addClass('error');
+          showToast('Error saving configuration: ' + error.message, 'error');
+        })
+        .finally(function() {
+          $btn.prop('disabled', false).text('Save Configuration');
+        });
+    });
+    
+    // Load config when Config tab is clicked
+    $('[data-tab="config"]').on('click', function() {
+      console.log('[Config] Tab clicked, loading config...');
+      loadConfig();
+    });
+    
+    /**
+     * Load configuration from server and populate form
+     */
+    function loadConfig() {
+      server.exec_api(null, CONFIG.api.module, 'getConfig')
+        .then(function(result) {
+          if (result && result.success && result.data && result.data.config) {
+            var config = result.data.config;
+            console.log('[Config] Loaded:', config);
+            
+            // Populate form fields
+            // Don't populate API key for security - leave blank unless user wants to change
+            $('#modelName').val(config.modelName || 'claude-haiku-4-5');
+            
+            // Journal settings if they exist
+            if (config.journalEnabled !== undefined) {
+              $('#journalEnabled').prop('checked', config.journalEnabled !== 'false');
+            }
+            if (config.journalFolderUrl) {
+              $('#journalFolderUrl').val(config.journalFolderUrl);
+            }
+          } else {
+            console.warn('[Config] Failed to load config:', result);
+          }
+        })
+        .catch(function(error) {
+          console.error('[Config] Error loading config:', error);
+        });
+    }
 
     // Load saved conversations into dropdown
     loadConversationDropdown();
