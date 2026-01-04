@@ -366,7 +366,11 @@
      * Load configuration from server and populate form
      */
     function loadConfig() {
-      server.exec_api(null, CONFIG.api.module, 'getConfig')
+      // Store reference to promise chain to prevent memory leak warnings
+      // gas_client warns if .then() is created but promise is abandoned
+      var configPromise = server.exec_api(null, CONFIG.api.module, 'getConfig');
+      
+      configPromise
         .then(function(result) {
           if (result && result.success && result.data && result.data.config) {
             var config = result.data.config;
@@ -374,7 +378,7 @@
             
             // Populate form fields
             // Don't populate API key for security - leave blank unless user wants to change
-            $('#modelName').val(config.modelName || 'claude-haiku-4-5');
+            $('#modelName').val(config.modelName || 'claude-haiku-4-5-20250929');
             
             // Journal settings if they exist
             if (config.journalEnabled !== undefined) {
@@ -389,6 +393,10 @@
         })
         .catch(function(error) {
           console.error('[Config] Error loading config:', error);
+        })
+        .finally(function() {
+          // Ensures promise chain completes, preventing memory leak warning
+          console.log('[Config] Load operation completed');
         });
     }
 

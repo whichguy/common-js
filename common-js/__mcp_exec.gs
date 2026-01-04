@@ -1110,4 +1110,4 @@ function exec_api(options, moduleName, functionName) {
   return result;
 }
 
-__defineModule__(_main, 'common-js/__mcp_exec', { loadNow: true });
+__defineModule__(_main, true, { explicitName: 'common-js/__mcp_exec' });
