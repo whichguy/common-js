@@ -80,14 +80,8 @@
       <button class="icon-btn" id="viewJournalBtn" title="View conversation in Google Drive" style="display: none;">
         <span class="material-icons">folder_open</span>
       </button>
-      <button class="icon-btn" id="loadThreadBtn" title="Load conversation from sheet">
-        <span class="material-icons">history</span>
-      </button>
-      <button class="icon-btn" id="saveThreadBtn" title="Save conversation to sheet">
-        <span class="material-icons">bookmark_border</span>
-      </button>
-      <button class="icon-btn" id="clearChatBtn" title="Clear conversation">
-        <span class="material-icons">autorenew</span>
+      <button class="icon-btn" id="clearChatBtn" title="Delete conversation">
+        <span class="material-icons">delete</span>
       </button>
     </div>
   </div>

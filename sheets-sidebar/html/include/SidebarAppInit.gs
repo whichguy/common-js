@@ -160,7 +160,7 @@
         console.log('Clear Chat button clicked');
         
         // Confirm with user
-        if (!confirm('Clear the current conversation? This will start a new chat.')) {
+        if (!confirm('Delete this conversation? This cannot be undone.')) {
           return;
         }
         
@@ -354,6 +354,21 @@
         .finally(function() {
           $btn.prop('disabled', false).text('Save Configuration');
         });
+    });
+    
+    // Tab switching handler - toggles active class on tabs and content
+    $('.tab').on('click', function() {
+      var tab = $(this).data('tab');
+      
+      // Update tab button states
+      $('.tab').removeClass('active').attr('aria-selected', 'false');
+      $(this).addClass('active').attr('aria-selected', 'true');
+      
+      // Update tab content visibility
+      $('.tab-content').removeClass('active');
+      $('#' + tab + 'Tab').addClass('active');
+      
+      console.log('[Tabs] Switched to:', tab);
     });
     
     // Load config when Config tab is clicked
