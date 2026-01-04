@@ -33,8 +33,18 @@
     $('#cancelBtn').on('click', function() {
       console.log('[SidebarApp] Cancel button clicked');
       if (currentCancellableCall) {
-        // Clear the reference so we ignore the result when it comes back
+        // Store reference before clearing so we can attach handlers to prevent memory leak
+        var pendingCall = currentCancellableCall;
+        
+        // Clear the reference so sendMessage's await ignores the result
         currentCancellableCall = null;
+        
+        // CRITICAL: Attach .catch() to prevent "potential memory leak" warning
+        // The promise will still resolve/reject, we just ignore the result
+        pendingCall.catch(function(err) {
+          console.log('[Cancel] Ignored error from cancelled request:', err.message || err);
+        });
+        
         hideLoadingState();
         showToast('Request cancelled (server may still be processing)', 'info');
         console.log('[Cancel] UI reset - ignoring any pending server response');
