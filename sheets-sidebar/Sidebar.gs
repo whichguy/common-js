@@ -168,7 +168,7 @@
             <select id="modelName">
               <option value="claude-sonnet-4-5-20250929">Claude Sonnet 4.5</option>
               <option value="claude-haiku-4-5-20250929" selected>Claude Haiku 4.5</option>
-              <option value="claude-opus-4-1-20250929">Claude Opus 4.1</option>
+              <option value="claude-opus-4-5-20250514">Claude Opus 4.5</option>
             </select>
             <div class="help-text">Select the Claude model to use for conversations</div>
           </div>
