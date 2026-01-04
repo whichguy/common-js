@@ -52,7 +52,6 @@
     
     // Combined keydown handler for Enter key and arrow key navigation
     $('#messageInput').on('keydown', function(e) {
-      console.log('[MessageInput] Keydown event:', e.key, 'Shift:', e.shiftKey);
       
       // Handle Enter key to send (Shift+Enter for new line)
       if (e.key === 'Enter' && !e.shiftKey) {

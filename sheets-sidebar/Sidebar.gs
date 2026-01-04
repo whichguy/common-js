@@ -231,15 +231,16 @@
   <!-- Toast notification container -->
   <div class="toast-container" id="toastContainer"></div>
 
+  <!-- Template Include: gas_client -->
+  <!-- Promise-based wrapper for google.script.run API -->
+  <!-- MUST load before any code that uses window.server or window.waitForServer -->
+  <?!= include('common-js/html/gas_client') ?>
+
   <!-- Template Include: SidebarScript.gs -->
   <!-- The include() scriptlet evaluates server-side and injects -->
   <!-- the entire contents of SidebarScript.gs inline at this location. -->
   <!-- Note: SidebarScript.gs is an HTML file, NOT a CommonJS module. -->
   <?!= include('sheets-sidebar/SidebarScript') ?>
-
-  <!-- Template Include: gas_client -->
-  <!-- Promise-based wrapper for google.script.run API -->
-  <?!= include('common-js/html/gas_client') ?>
 
   <!-- Template Include: SidebarApp.gs -->
   <!-- Main application logic: message history, send button, event handlers -->

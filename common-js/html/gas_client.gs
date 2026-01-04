@@ -430,183 +430,6 @@ function createGasServer(config = {}) {
               (value) => Promise.resolve(onFinally && onFinally()).then(() => value),
               (reason) => Promise.resolve(onFinally && onFinally()).then(() => Promise.reject(reason))
             );
-          },
-
-          /**
-           * Cancel the in-flight request by posting to cancel queue
-           * @param {string} reason - Cancellation reason
-           * @returns {Promise} Promise resolving with cancel result
-           */
-          cancel: function(reason) {
-            // Extract requestId from original call args with validation
-            // For exec_api(null, module, function, params), requestId is in args[3] (params object)
-            const originalRequestId = (function() {
-              // Primary: args[3].requestId for exec_api(null, module, func, {requestId, ...})
-              if (typeof args[3] === 'object' && args[3]?.requestId) {
-                return args[3].requestId;
-              }
-              // Fallback: args[0].requestId for direct object param
-              if (typeof args[0] === 'object' && args[0]?.requestId) {
-                return args[0].requestId;
-              }
-              // No requestId found
-              if (debug) {
-                logger.warn(`[GasServer][${requestId}] No requestId in cancel args:`, args);
-              }
-              return null;
-            })();
-
-            if (debug) {
-              logger.log(`[GasServer][${requestId}] Cancel requested for ${originalRequestId}`);
-            }
-
-            // Stop polling if active
-            if (api._pollingController && api._pollingController.isActive()) {
-              api._pollingController.stop();
-              if (debug) {
-                logger.log(`[GasServer][${requestId}] Stopped polling controller`);
-              }
-            }
-
-            // If no requestId, resolve with error (don't reject - not a failure)
-            if (!originalRequestId) {
-              return Promise.resolve({ success: false, reason: 'No requestId available' });
-            }
-
-            // Call server to post cancel message
-            return new Promise(function(resolve, reject) {
-              google.script.run
-                .withSuccessHandler(function(result) {
-                  if (debug) {
-                    logger.log(`[GasServer][${requestId}] Cancel posted:`, result);
-                  }
-                  resolve(result);
-                })
-                .withFailureHandler(function(error) {
-                  logger.error(`[GasServer][${requestId}] Cancel error:`, error);
-                  reject(error);
-                })
-                .postCancelRequest(originalRequestId, reason || 'User cancelled');
-            });
-          },
-
-          /**
-           * Start continuous polling for streaming data (e.g., thinking messages)
-           * @param {Function} callback - Called with (messages) on each poll
-           * @param {Object} options - Polling configuration
-           * @returns {Object} Controller with stop() and isActive() methods
-           */
-          poll(callback, options = {}) {
-            const pollModule = options.pollModule || 'sheets-chat/UISupport';
-            const pollFunction = options.pollFunction || 'pollMessages';
-            const checkIntervalMs = options.checkIntervalMs || 300;
-            const maxDuration = options.maxDuration || 180000;
-            const continuous = options.continuous !== false;
-
-            let isActive = true;
-            const pollStartTime = Date.now();
-
-            // DEBUG: Always log poll start to diagnose requestId extraction
-            console.log('[GasServer][poll] Starting poll with args:', JSON.stringify(args));
-            console.log('[GasServer][poll] args[3]:', JSON.stringify(args[3]));
-            console.log('[GasServer][poll] args[3]?.requestId:', args[3]?.requestId);
-
-            if (debug) {
-              logger.log(`[GasServer][${requestId}] Starting poll with options:`, options);
-            }
-
-            // Extract requestId from original call args with validation
-            // For exec_api(null, module, function, params), requestId is in args[3] (params object)
-            const originalRequestId = (function() {
-              // Primary: args[3].requestId for exec_api(null, module, func, {requestId, ...})
-              if (typeof args[3] === 'object' && args[3]?.requestId) {
-                console.log('[GasServer][poll] Found requestId in args[3]:', args[3].requestId);
-                return args[3].requestId;
-              }
-              // Fallback: args[0].requestId for direct object param
-              if (typeof args[0] === 'object' && args[0]?.requestId) {
-                console.log('[GasServer][poll] Found requestId in args[0]:', args[0].requestId);
-                return args[0].requestId;
-              }
-              // No requestId found
-              console.warn('[GasServer][poll] No requestId found in args!');
-              if (debug) {
-                logger.warn(`[GasServer][${requestId}] No requestId in poll args:`, args);
-              }
-              return null;
-            })();
-            
-            console.log('[GasServer][poll] Extracted originalRequestId:', originalRequestId);
-
-            // Polling loop function
-            function doPoll() {
-              if (!isActive) {
-                if (debug) logger.log(`[GasServer][${requestId}] Poll stopped (isActive=false)`);
-                return;
-              }
-
-              // Check timeout
-              if (Date.now() - pollStartTime > maxDuration) {
-                if (debug) logger.log(`[GasServer][${requestId}] Poll timeout after ${maxDuration}ms`);
-                isActive = false;
-                return;
-              }
-
-              // Make poll request using google.script.run directly
-              google.script.run
-                .withSuccessHandler(function(result) {
-                  if (!isActive) return;
-
-                  // Extract messages from result
-                  const messages = result?.data?.messages || result?.messages || result || [];
-
-                  if (messages && messages.length > 0) {
-                    if (debug) logger.log(`[GasServer][${requestId}] Poll received ${messages.length} messages`);
-                    try {
-                      callback(messages);
-                    } catch (e) {
-                      logger.error(`[GasServer][${requestId}] Poll callback error:`, e);
-                    }
-                  }
-
-                  // Schedule next poll if continuous
-                  if (isActive && continuous) {
-                    setTimeout(doPoll, checkIntervalMs);
-                  }
-                })
-                .withFailureHandler(function(error) {
-                  if (!isActive) return;
-                  logger.error(`[GasServer][${requestId}] Poll error:`, error);
-                  // Continue polling despite errors
-                  if (isActive && continuous) {
-                    setTimeout(doPoll, checkIntervalMs);
-                  }
-                })
-                .exec_api(null, pollModule, pollFunction, `thinking-${originalRequestId}`, { maxWaitMs: 5000, checkIntervalMs: checkIntervalMs });
-              
-              // DEBUG: Log the channel being polled
-              console.log('[GasServer][poll] Polling channel: thinking-' + originalRequestId);
-            }
-
-            // Start first poll after initial delay
-            setTimeout(doPoll, checkIntervalMs);
-
-            // Create controller
-            var controller = {
-              stop: function() {
-                if (debug) logger.log(`[GasServer][${requestId}] Poll stopped by controller`);
-                isActive = false;
-              },
-              isActive: function() {
-                return isActive;
-              }
-            };
-
-            // Store controller reference for cancel() to stop
-            api._pollingController = controller;
-
-            // Return controller
-            return controller;
           }
         };
 
@@ -619,12 +442,12 @@ function createGasServer(config = {}) {
 // Make available globally for use in client-side HTML code
 if (typeof window !== 'undefined') {
   window.createGasServer = createGasServer;
-  
+
   // Storage for the server instance
   window._serverInstance = null;
   window._serverInitError = null;
   window._serverReadyCallbacks = [];
-  
+
   /**
    * Initialize the server instance
    * @returns {boolean} True if successfully initialized
@@ -633,16 +456,16 @@ if (typeof window !== 'undefined') {
     if (window._serverInstance) {
       return true; // Already initialized
     }
-    
+
     // Check if google.script.run is available
     if (typeof google === 'undefined' || !google.script || !google.script.run) {
       return false; // Not yet available
     }
-    
+
     try {
       window._serverInstance = createGasServer({ debug: false });
       console.log('[gas_client] Server instance created successfully');
-      
+
       // Notify any waiting callbacks
       while (window._serverReadyCallbacks.length > 0) {
         var callback = window._serverReadyCallbacks.shift();
@@ -652,7 +475,7 @@ if (typeof window !== 'undefined') {
           console.error('[gas_client] Error in ready callback:', e);
         }
       }
-      
+
       return true;
     } catch (e) {
       window._serverInitError = e;
@@ -660,7 +483,7 @@ if (typeof window !== 'undefined') {
       return false;
     }
   }
-  
+
   /**
    * Wait for server to be ready (Promise-based)
    * @param {number} timeoutMs - Maximum wait time (default 10000ms)
@@ -668,42 +491,42 @@ if (typeof window !== 'undefined') {
    */
   window.waitForServer = function(timeoutMs) {
     timeoutMs = timeoutMs || 10000;
-    
+
     return new Promise(function(resolve, reject) {
       // Already initialized?
       if (window._serverInstance) {
         resolve(window._serverInstance);
         return;
       }
-      
+
       // Previous error?
       if (window._serverInitError) {
         reject(window._serverInitError);
         return;
       }
-      
+
       // Try to initialize now
       if (initializeServer()) {
         resolve(window._serverInstance);
         return;
       }
-      
+
       // Set up timeout
       var timeoutId = setTimeout(function() {
         var idx = window._serverReadyCallbacks.indexOf(onReady);
         if (idx !== -1) window._serverReadyCallbacks.splice(idx, 1);
         reject(new Error('Timeout waiting for server after ' + timeoutMs + 'ms'));
       }, timeoutMs);
-      
+
       function onReady(server) {
         clearTimeout(timeoutId);
         resolve(server);
       }
-      
+
       window._serverReadyCallbacks.push(onReady);
     });
   };
-  
+
   // Define window.server as a getter that tries to initialize on access
   Object.defineProperty(window, 'server', {
     get: function() {
@@ -714,7 +537,7 @@ if (typeof window !== 'undefined') {
     },
     configurable: true
   });
-  
+
   // Try to initialize immediately
   if (!initializeServer()) {
     // Not ready yet - poll until google.script.run is available

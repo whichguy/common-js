@@ -257,11 +257,7 @@
     currentRequestId = 'req-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
     console.log('[SendMessage] Generated request ID:', currentRequestId);
     
-    // Cancel any previous polling to prevent orphaned loops
-    if (currentPollingController) {
-      console.log('[Polling] Cancelling previous polling controller');
-      currentPollingController.stop();
-    }
+    // Note: polling functionality removed - gas_client doesn't support .poll()
     
     try {
       // Build message content (text + attachments)
@@ -338,26 +334,8 @@
         }
       );
       
-      // Start continuous polling for thinking messages
-      // The .poll() method returns a controller when continuous: true
-      currentPollingController = currentCancellableCall.poll(
-        (messages) => {
-          // Callback invoked each time thinking messages are received
-          if (messages && messages.length > 0) {
-            console.log(`[Polling] Received ${messages.length} thinking messages`);
-            updateThinkingBubble(messages, $thinkingBubble);
-          }
-        },
-        {
-          continuous: true,
-          maxWaitMs: CONFIG.polling.MAX_WAIT_MS,
-          checkIntervalMs: CONFIG.polling.CHECK_INTERVAL_MS,
-          maxDuration: CONFIG.polling.MAX_DURATION_MS
-        }
-      );
-      
-      // Capture controller for use in error/finally blocks
-      const controller = currentPollingController;
+      // Note: Real-time thinking updates will come from the server response
+      // gas_client doesn't have .poll() - thinking messages are returned in final response
       
       const result = await currentCancellableCall;
       
@@ -448,12 +426,7 @@
       // Clear current request ID
       currentRequestId = null;
       
-      // Stop and clean up polling controller if it's still the current one
-      if (currentPollingController === controller) {
-        controller.stop();  // Stop the polling loop by setting isActive = false
-        currentPollingController = null;
-        console.log('[Polling] Stopped and cleaned up controller');
-      }
+      // Polling controller cleanup removed - gas_client doesn't support polling
     }
   }
 
@@ -553,6 +526,71 @@
     } catch (error) {
       console.error('[Conversation] Error loading:', error);
       showToast('Failed to load conversation: ' + error.message, 'error');
+    }
+  }
+
+  /**
+   * Load saved conversations into the dropdown selector
+   * Called on sidebar initialization
+   */
+  async function loadConversationDropdown() {
+    var $dropdown = $('#conversationSelector');
+    if (!$dropdown.length) {
+      console.warn('[Conversation] Dropdown selector not found');
+      return;
+    }
+    
+    try {
+      // Show loading state
+      $dropdown.addClass('loading');
+      $dropdown.html('<option value="">Loading conversations...</option>');
+      
+      var result = await server.exec_api(
+        null,
+        CONFIG.api.module,
+        CONFIG.api.functions.listConversations
+      );
+      
+      // Reset dropdown
+      $dropdown.removeClass('loading');
+      $dropdown.empty();
+      $dropdown.append('<option value="">Select a conversation...</option>');
+      
+      if (!result || !result.success) {
+        console.warn('[Conversation] Failed to load conversations:', result && result.error);
+        return;
+      }
+      
+      var conversations = result.data.conversations || [];
+      
+      if (conversations.length === 0) {
+        console.log('[Conversation] No saved conversations found');
+        return;
+      }
+      
+      // Add conversations to dropdown
+      conversations.forEach(function(conv) {
+        var $option = $('<option></option>');
+        $option.val(conv.id);
+        // Use .text() for XSS safety
+        $option.text(conv.title || 'Untitled (' + new Date(conv.savedAt).toLocaleDateString() + ')');
+        $dropdown.append($option);
+      });
+      
+      // Add change handler to load selected conversation
+      $dropdown.off('change').on('change', function() {
+        var conversationId = $(this).val();
+        if (conversationId) {
+          loadConversation(conversationId);
+        }
+      });
+      
+      console.log('[Conversation] Loaded', conversations.length, 'conversations into dropdown');
+      
+    } catch (error) {
+      console.error('[Conversation] Error loading dropdown:', error);
+      $dropdown.removeClass('loading');
+      $dropdown.html('<option value="">Error loading conversations</option>');
     }
   }
 

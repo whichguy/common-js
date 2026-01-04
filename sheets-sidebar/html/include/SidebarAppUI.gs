@@ -418,37 +418,36 @@
     (function init() {
       console.log('[Picker] Initializing Picker Manager');
       
-      // HIGH-1: Request OAuth token from server
-      server.exec_api(null, 'sheets-chat/UISupport', 'getOAuthToken')
-        .then(function(token) {
-          // HIGH-3: Validate and store token securely
-          if (PickerManager.setToken(token)) {
-            console.log('[SidebarApp] OAuth token validated');
-            
-            // CRITICAL-4: Get project ID from server
-            server.exec_api(null, 'sheets-chat/UISupport', 'getScriptId')
-              .then(function(projectId) {
-                if (projectId) {
-                  PickerManager.setProjectId(projectId);
-                  
-                  // HIGH-1: Load Picker API with error handling
-                  return PickerManager.loadApi();
-                } else {
-                  console.error('[SidebarApp] No project ID returned from server');
-                }
-              })
-              .then(function() {
-                console.log('[SidebarApp] Picker fully initialized');
-              })
-              .catch(function(error) {
-                console.error('[SidebarApp] Failed to initialize Picker:', error);
-              });
-          } else {
-            console.error('[SidebarApp] Failed to validate OAuth token');
-          }
+      // Wait for server to be ready before making API calls
+      window.waitForServer(10000)
+        .then(function(server) {
+          // HIGH-1: Request OAuth token from server
+          return server.exec_api(null, 'sheets-chat/UISupport', 'getOAuthToken')
+            .then(function(token) {
+              // HIGH-3: Validate and store token securely
+              if (!PickerManager.setToken(token)) {
+                throw new Error('Failed to validate OAuth token');
+              }
+              console.log('[SidebarApp] OAuth token validated');
+              
+              // CRITICAL-4: Get project ID from server
+              return server.exec_api(null, 'sheets-chat/UISupport', 'getScriptId');
+            })
+            .then(function(projectId) {
+              if (!projectId) {
+                throw new Error('No project ID returned from server');
+              }
+              PickerManager.setProjectId(projectId);
+              
+              // HIGH-1: Load Picker API with error handling
+              return PickerManager.loadApi();
+            })
+            .then(function() {
+              console.log('[SidebarApp] Picker fully initialized');
+            });
         })
         .catch(function(error) {
-          console.error('[SidebarApp] Failed to get OAuth token:', error);
+          console.error('[SidebarApp] Failed to initialize Picker:', error);
         });
     })();
     
