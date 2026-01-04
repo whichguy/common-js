@@ -28,22 +28,16 @@
     });
     
     // Cancel button click
+    // Note: gas_client doesn't support .cancel() - GAS server functions cannot be interrupted
+    // This just resets the UI state; the server continues processing but we ignore the result
     $('#cancelBtn').on('click', function() {
       console.log('[SidebarApp] Cancel button clicked');
       if (currentCancellableCall) {
-        currentCancellableCall.cancel('User cancelled the request')
-          .then(function(result) {
-            console.log('[Cancel] Cancel result:', result);
-            if (result.success) {
-              showToast('Request cancelled', 'info');
-            } else {
-              showToast('Could not cancel: ' + result.reason, 'warning');
-            }
-          })
-          .catch(function(error) {
-            console.error('[Cancel] Error:', error);
-            showToast('Cancel failed: ' + error.message, 'error');
-          });
+        // Clear the reference so we ignore the result when it comes back
+        currentCancellableCall = null;
+        hideLoadingState();
+        showToast('Request cancelled (server may still be processing)', 'info');
+        console.log('[Cancel] UI reset - ignoring any pending server response');
       } else {
         console.warn('[Cancel] No active request to cancel');
         showToast('No active request to cancel', 'info');
